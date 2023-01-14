@@ -12,21 +12,19 @@ from selenium.webdriver.support.ui import WebDriverWait
 class Puppy:
 
     polite_wait = 1
-    nlp = spacy.load('en_core_web_sm')
+    nlp = spacy.load('en_core_web_lg')
 
-    def get_target_tokens_freq(self):
-        page_tokens = dict()
+    def get_tokenized_target(self):
         self.driver.get(self.target)
-        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, "#bodyContent p")
-        for paragraph in content_paragraphs:
-            if paragraph.find_elements(By.TAG_NAME, "a"):
-                doc = self.nlp(paragraph.text)
-                tokens = [token.text for token in doc if token.pos_=="NOUN"]
-                for token in tokens:
-                    if token not in page_tokens:
-                        page_tokens[token] = 1
-                    page_tokens[token] += 1
-        return page_tokens
+        target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output > p")
+        print(target_paragraphs)
+        all_text_content = ''
+        for paragraph in target_paragraphs:
+            all_text_content = ' '.join([all_text_content, paragraph.text])
+        doc = self.nlp(all_text_content)
+        tokenized_target = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']]))
+        return tokenized_target
+
 
     def pick_random_link(self):
         anchors = self.driver.find_elements(By.TAG_NAME, "a")
@@ -44,33 +42,26 @@ class Puppy:
         return random.choice(clean_links)
 
     def generate_paragraph_map(self):
-        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, "#bodyContent p")
+        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output > p")
         paragraph_map = dict()
         for paragraph in content_paragraphs:
             if paragraph.find_elements(By.TAG_NAME, "a"):
-                paragraph_map[paragraph] = 0
                 doc = self.nlp(paragraph.text)
-                tokens = [token.text for token in doc if token.pos_=="NOUN"]
-                for token in tokens:
-                    if token in self.target_freq:
-                        paragraph_map[paragraph] += self.target_freq[token]
+                tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']]))
+                similarity = tokenized_paragraph.similarity(self.tokenized_target)
+                paragraph_map[paragraph] = similarity
         return paragraph_map
 
     def get_best_links(self, paragraph_map):
-        sorted_paragraphs = {k: v for k, v in sorted(paragraph_map.items(), key=lambda item: item[1])}
         anchors = []
-        if len(sorted_paragraphs) <= 5:
-            for paragraph in sorted_paragraphs:
-                print(sorted_paragraphs[paragraph])
-                anchors.extend(paragraph.find_elements(By.TAG_NAME, "a"))
-        else:
-            for i in range(4):
-                keys = list(sorted_paragraphs.keys())
-                paragraph = keys[len(keys) - (1 + i)]
-                print(sorted_paragraphs[paragraph])
+        for paragraph in paragraph_map:
+            if paragraph_map[paragraph] > 0.65:
+                print("promising paragraph found:\n")
+                print(paragraph.text)
+                print("----------------------------------------\n\n\n")
                 anchors.extend(paragraph.find_elements(By.TAG_NAME, "a"))
         viable_articles = []
-        current_page_id = self.driver.current_url.split("/")[4]
+        current_page_id = urllib.parse.unquote(self.driver.current_url.split("/")[4])
         for anchor in anchors:
             link = anchor.get_attribute("href")
             if not link or "/en.wikipedia.org/wiki/" not in link:
@@ -92,44 +83,14 @@ class Puppy:
         self.target_id = target.split("/")[4]
         self.driver = webdriver.Firefox()
         self.history = list()
-        self.target_freq = dict()
+        self.tokenized_target = None
 
     def kill_driver(self):
         self.driver.close()
         self.driver.quit()
 
-    def find_viable_articles(self, url):
-        self.driver.implicitly_wait(self.polite_wait)
-        self.driver.get(url)
-        print(f"[*] 🐶 is now visiting {url}")
-        current_page_id = url.split("/")[4]
-        anchors = self.driver.find_elements(By.TAG_NAME, 'a')
-        viable_articles = []
-        for anchor in anchors:
-            link = anchor.get_attribute("href")
-            if not link or "/en.wikipedia.org/wiki/" not in link:
-                continue
-            link = urllib.parse.unquote(link)
-            new_article_id = link.split("/")[4]
-            if current_page_id == new_article_id or new_article_id in self.history or "?" in new_article_id or ":" in new_article_id or "#" in new_article_id:
-                continue
-            viable_articles.append(link)
-        print(f"[*] {len(viable_articles)} viable articles found @ page {url}")
-        self.history.append(current_page_id)
-        return viable_articles
-
-    def go(self):
-        self.target_freq = self.get_target_tokens_freq()
-        while True:
-            viable_articles = self.find_viable_articles(self.current_url)
-            if self.target in viable_articles:
-                self.history.append(self.target_id)
-                self.kill_driver()
-                return f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"
-            self.driver.get(random.choice(viable_articles))
-
     def run(self):
-        self.target_freq = self.get_target_tokens_freq()
+        self.tokenized_target = self.get_tokenized_target()
         self.driver.get(self.start)
         while True:
             paragraphs = self.generate_paragraph_map()
@@ -140,7 +101,6 @@ class Puppy:
                 return f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"
             if viable_articles:
                 random_article = random.choice(viable_articles)
-                print(random_article)
                 self.driver.get(random_article)
             else:
                 random_article = self.pick_random_link()
