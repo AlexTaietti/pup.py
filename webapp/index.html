@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Welcome to the Puppy World</title>
+  </head>
+  <body>
+    <h1>Hello Puppy Lovers!</h1>
+    <form id="form">
+      <label for="start">Start:</label>
+      <input type="text" id="start" name="start"><br>
+      <label for="target">Target:</label>
+      <input type="text" id="target" name="target"><br>
+      <input type="button" value="Submit" onclick="submitForm()">
+    </form>
+    <pre id="result"></pre>
+  </body>
+  <script>
+    var resultDisplay = document.getElementById("result"); 
+    function submitForm() {
+	var formData = {
+        "start": document.getElementById("start").value,
+        "target": document.getElementById("target").value
+      };
+      
+      fetch('http://127.0.0.1:5000/fetch', {
+        method: 'POST', 
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Success:', data);
+	resultDisplay.innerHTML = data;
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
+    }
+  </script>
+</html>
+
