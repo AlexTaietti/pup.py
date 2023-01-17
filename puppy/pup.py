@@ -98,7 +98,7 @@ class Puppy:
             if self.target in viable_articles:
                 self.history.append(self.target_id)
                 self.kill_driver()
-                return f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"
+                return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
             if viable_articles:
                 random_article = random.choice(viable_articles)
                 self.driver.get(random_article)

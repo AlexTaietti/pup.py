@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from puppy import pup
 from flask_cors import CORS
 
@@ -12,6 +12,6 @@ def fetch():
     target = data["target"]
     pupper = pup.Puppy(start, target)
     result = pupper.run()
-    return result
+    return jsonify(result)
 
 app.run()
