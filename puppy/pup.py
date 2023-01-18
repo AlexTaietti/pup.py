@@ -17,7 +17,6 @@ class Puppy:
     def get_tokenized_target(self):
         self.driver.get(self.target)
         target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3")
-        print(target_paragraphs)
         all_text_content = ''
         for paragraph in target_paragraphs:
             all_text_content = ' '.join([all_text_content, paragraph.text])
@@ -41,6 +40,7 @@ class Puppy:
         anchors = []
         for paragraph in paragraph_map:
             if paragraph_map[paragraph] > self.similarity_treshold:
+                print("----------------------------------------\n")
                 print("promising fragment found:\n")
                 print(paragraph.text)
                 print("----------------------------------------\n\n")
