@@ -30,34 +30,54 @@ class Puppy:
         for paragraph in content_paragraphs:
             if paragraph.find_elements(By.TAG_NAME, "a"):
                 doc = self.nlp(paragraph.text)
-                tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']]))
+                tokens = ' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']])
+                tokenized_paragraph = self.nlp(tokens)
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
                 paragraph_map[paragraph] = similarity
         return paragraph_map
 
-    def get_best_links(self, paragraph_map):
-        url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
-        anchors = []
-        for paragraph in paragraph_map:
-            if paragraph_map[paragraph] > self.similarity_treshold:
-                print("----------------------------------------\n")
-                print("promising fragment found:\n")
-                print(paragraph.text)
-                print("----------------------------------------\n\n")
-                anchors.extend(paragraph.find_elements(By.TAG_NAME, "a"))
-        viable_articles = []
-        current_page_id = url_decoded_current_url.split("/")[4]
+    def find_target(self):
+        anchors = self.driver.find_elements(By.TAG_NAME, "a")
         for anchor in anchors:
             link = anchor.get_attribute("href")
             if not link or "/en.wikipedia.org/wiki/" not in link:
                 continue
             link = urllib.parse.unquote(link)
-            new_article_id = link.split("/")[4]
-            if new_article_id == "Main_Page" or "?" in new_article_id or ":" in new_article_id or "#" in new_article_id:
-                continue
-            viable_articles.append(link)
-        print(f"[*] {len(viable_articles)} viable articles found @ page {url_decoded_current_url} (similarity >= {self.similarity_treshold})")
-        if not len(self.history) or not self.history[-1] == current_page_id:
+            if self.target == link:
+                return True
+        return False
+
+    def clean_link(self, anchor):
+        link = anchor.get_attribute("href")
+        if not link or "/en.wikipedia.org/wiki/" not in link:
+            return None
+        link = urllib.parse.unquote(link)
+        new_article_id = link.split("/")[4]
+        if new_article_id == "Main_Page" or "?" in new_article_id or ":" in new_article_id or "#" in new_article_id:
+            return None
+        return link
+
+    def get_best_links(self, paragraph_map):
+        anchors = []
+        for paragraph in paragraph_map:
+            if paragraph_map[paragraph] > self.similarity_treshold:
+                print("----------------------------------------")
+                print("promising fragment found:\n")
+                print(paragraph.text)
+                print("----------------------------------------\n\n")
+                anchors.extend(paragraph.find_elements(By.TAG_NAME, "a"))
+        if not anchors and self.similarity_treshold > 0.35:
+            self.similarity_treshold -= 0.05
+            return self.get_best_links(paragraph_map)
+        url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
+        viable_articles = []
+        current_page_id = url_decoded_current_url.split("/")[4]
+        for anchor in anchors:
+            valid_link = self.clean_link(anchor)
+            if valid_link:
+                viable_articles.append(valid_link)
+        print(f"[*] {len(viable_articles)} viable articles found @ page {url_decoded_current_url} (similarity >= {self.similarity_treshold})\n")
+        if not self.history or not self.history[-1] == current_page_id:
             self.history.append(current_page_id)
         return viable_articles
 
@@ -80,6 +100,11 @@ class Puppy:
         self.tokenized_target = self.get_tokenized_target()
         self.driver.get(self.start)
         while True:
+            target_found = self.find_target()
+            if target_found:
+                self.history.append(self.target_id)
+                self.kill_driver()
+                return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
             paragraphs = self.generate_paragraph_map()
             viable_articles = self.get_best_links(paragraphs)
             if not viable_articles and self.similarity_treshold > 0.35:
@@ -87,15 +112,11 @@ class Puppy:
                 continue
             if self.similarity_treshold < 0.95:
                 self.similarity_treshold = 0.95
-            if self.target in viable_articles:
-                self.history.append(self.target_id)
-                self.kill_driver()
-                return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
-            if len(viable_articles):
+            if viable_articles:
                 random_article = random.choice(viable_articles)
                 self.driver.get(random_article)
                 continue
-            print("[!] Puppy got completely lost, restarting...")
+            print("[!] Puppy got completely lost, going back to the beginning...")
             self.driver.get(self.start)
 
 
