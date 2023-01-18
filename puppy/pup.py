@@ -7,13 +7,25 @@ import urllib.parse
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 
 
 class Puppy:
 
-    polite_wait = 1
     nlp = spacy.load('en_core_web_lg')
+
+    def __init__(self, start, target):
+        self.current_url = self.start = start
+        self.target = target
+        self.start_id = start.split("/")[4]
+        self.target_id = target.split("/")[4]
+        self.driver = webdriver.Firefox()
+        self.history = list()
+        self.tokenized_target = None
+        self.similarity_treshold = 0.95
+
+    def kill_driver(self):
+        self.driver.close()
+        self.driver.quit()
 
     def get_tokenized_target(self):
         self.driver.get(self.target)
@@ -56,7 +68,7 @@ class Puppy:
             return None
         link = urllib.parse.unquote(link)
         new_article_id = link.split("/")[4]
-        if new_article_id == "Main_Page" or "?" in new_article_id or ":" in new_article_id or "#" in new_article_id:
+        if new_article_id == "Main_Page" or new_article_id == self.target_id or "#" in new_article_id or "?" in new_article_id or ":" in new_article_id:
             return None
         return link
 
@@ -84,21 +96,6 @@ class Puppy:
             self.history.append(current_page_id)
         return viable_articles
 
-
-    def __init__(self, start, target):
-        self.current_url = self.start = start
-        self.target = target
-        self.start_id = start.split("/")[4]
-        self.target_id = target.split("/")[4]
-        self.driver = webdriver.Firefox()
-        self.history = list()
-        self.tokenized_target = None
-        self.similarity_treshold = 0.95
-
-    def kill_driver(self):
-        self.driver.close()
-        self.driver.quit()
-
     def run(self):
         self.tokenized_target = self.get_tokenized_target()
         self.driver.get(self.start)
@@ -110,12 +107,10 @@ class Puppy:
                 return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
             paragraphs = self.generate_paragraph_map()
             viable_articles = self.get_best_links(paragraphs)
-            if not viable_articles and self.similarity_treshold > 0.35:
-                self.similarity_treshold -= 0.05
-                continue
             if self.similarity_treshold < 0.95:
                 self.similarity_treshold = 0.95
             if viable_articles:
+                print(viable_articles)
                 random_article = random.choice(viable_articles)
                 self.driver.get(random_article)
                 continue
