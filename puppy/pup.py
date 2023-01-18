@@ -1,6 +1,7 @@
 import time
 import random
 import sys
+import re
 import spacy
 import urllib.parse
 
@@ -19,7 +20,8 @@ class Puppy:
         target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3")
         all_text_content = ''
         for paragraph in target_paragraphs:
-            all_text_content = ' '.join([all_text_content, paragraph.text])
+            clean_paragraph = re.sub("[\[].*?[\]]", "", paragraph.text)
+            all_text_content = ' '.join([all_text_content, clean_paragraph])
         doc = self.nlp(all_text_content)
         tokenized_target = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']]))
         return tokenized_target
@@ -29,7 +31,8 @@ class Puppy:
         paragraph_map = dict()
         for paragraph in content_paragraphs:
             if paragraph.find_elements(By.TAG_NAME, "a"):
-                doc = self.nlp(paragraph.text)
+                clean_paragraph = re.sub("[\[].*?[\]]", "", paragraph.text)
+                doc = self.nlp(clean_paragraph)
                 tokens = ' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN']])
                 tokenized_paragraph = self.nlp(tokens)
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
