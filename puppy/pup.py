@@ -2,9 +2,9 @@ import time
 import random
 import sys
 import re
-import spacy
 import urllib.parse
 import pprint
+import spacy
 
 from bs4 import BeautifulSoup as bs
 from selenium import webdriver
@@ -30,13 +30,14 @@ class Puppy:
 
     def get_tokenized_target(self):
         self.driver.get(self.target)
-        target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3")
+        target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         all_text_content = ''
         for paragraph in target_paragraphs:
             clean_paragraph = re.sub("\[.*?\]", "", paragraph.text)
+            clean_paragraph = clean_paragraph.replace("\n", " ")
             all_text_content = ' '.join([all_text_content, clean_paragraph])
-        doc = self.nlp(all_text_content)
-        tokenized_target = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN', 'VERB']]))
+        doc = self.nlp(all_text_content.lower())
+        tokenized_target = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
         return tokenized_target
 
     def generate_sentence_map(self, inner_html):
@@ -45,9 +46,12 @@ class Puppy:
         for sentence in sentences:
             if not sentence:
                 continue
-            soupy_sentence = bs(sentence)
-            doc = self.nlp(soupy_sentence.get_text())
-            tokenized_sentence = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN', 'VERB']]))
+            soupy_sentence = bs(sentence, features="html.parser")
+            clean_sentence = soupy_sentence.get_text().replace("\n", " ")
+            doc = self.nlp(clean_sentence.lower())
+            tokenized_sentence = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
+            if not tokenized_sentence:
+                continue
             similarity = tokenized_sentence.similarity(self.tokenized_target)
             sentence_anchors = soupy_sentence.find_all("a")
             if not sentence_anchors:
@@ -72,7 +76,7 @@ class Puppy:
         return sentences_map
 
     def generate_paragraph_map(self):
-        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3")
+        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         paragraph_map = dict()
         for paragraph in content_paragraphs:
             if paragraph.find_elements(By.TAG_NAME, "a"):
@@ -80,8 +84,9 @@ class Puppy:
                 sentences_map = self.generate_sentence_map(clean_paragraph_html)
                 if not sentences_map:
                     continue
-                doc = self.nlp(re.sub("\[.*?\]", "", paragraph.text))
-                tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ['NOUN', 'PROPN', 'VERB']]))
+                clean_paragraph = re.sub("\[.*?\]", "", paragraph.text.replace("\n", " ")) 
+                doc = self.nlp(clean_paragraph.lower())
+                tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
                 paragraph_map[paragraph] = {"sim": similarity, "sents_map": sentences_map}
         return paragraph_map
@@ -111,7 +116,6 @@ class Puppy:
         max_p = max(paragraph_map, key=lambda p: paragraph_map[p]['sim'])
         sents_map = paragraph_map[max_p]["sents_map"]
         max_urls = max(sents_map, key=sents_map.get)
-        print(sents_map[max_urls])
         similarity = "{:.2f}".format(sents_map[max_urls])
         url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
         viable_articles = []
@@ -138,33 +142,7 @@ class Puppy:
             paragraphs = self.generate_paragraph_map()
             viable_articles = self.get_best_links(paragraphs)
             if viable_articles:
-                best_link = None
-                sim = 0
-                for article in viable_articles:
-                    art_id = article.split("/")[4]
-                    if "_" in art_id:
-                        art_id = " ".join(art_id.split("_"))
-                    similarity = self.nlp(art_id).similarity(self.tokenized_target)
-                    if similarity > sim:
-                        best_link = article
-                if not best_link:
-                    best_link = random.choice(viable_articles)
-                print(f"[*] best article @ {urllib.parse.unquote(self.driver.current_url)} is {article}")
-                if len(self.history) > 2:
-                    last_article_id = self.history[-1]
-                    two_articles_ago = self.history[-2]
-                    url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
-                    all_links = []
-                    if last_article_id == best_link.split("/")[4] and two_articles_ago == url_decoded_current_url.split("/")[4]:
-                        print("[!] stuck :(")
-                        anchors = self.driver.find_elements(By.TAG_NAME, "a")
-                        for anchor in anchors:
-                            link = anchor.get_attribute("href")
-                            if not link or "/en.wikipedia.org/wiki/" not in link:
-                                continue
-                            link = urllib.parse.unquote(link)
-                            all_links.append(link)
-                        best_link = random.choice(all_links)
+                best_link = random.choice(viable_articles)
                 self.driver.get(best_link)
                 continue
             print("[!] Puppy got completely lost, going back to the beginning...")
