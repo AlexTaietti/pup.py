@@ -136,7 +136,9 @@ class Puppy:
         while True:
             target_found = self.find_target()
             if target_found:
-                self.history.append(self.target_id)
+                url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
+                current_page_id = url_decoded_current_url.split("/")[4]
+                self.history.append([current_page_id, self.target_id])
                 self.kill_driver()
                 return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
             paragraphs = self.generate_paragraph_map()
