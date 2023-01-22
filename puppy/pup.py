@@ -5,6 +5,7 @@ import re
 import urllib.parse
 import pprint
 import spacy
+import requests
 
 from bs4 import BeautifulSoup as bs
 from selenium import webdriver
@@ -20,20 +21,16 @@ class Puppy:
         self.target = target
         self.start_id = start.split("/")[4]
         self.target_id = target.split("/")[4]
-        self.driver = webdriver.Firefox()
         self.history = list()
         self.tokenized_target = None
 
-    def kill_driver(self):
-        self.driver.close()
-        self.driver.quit()
-
     def get_tokenized_target(self):
-        self.driver.get(self.target)
-        target_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+        response = requests.get(self.target)
+        target_soup = bs(response.text, 'html.parser')
+        elements = target_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         all_text_content = ''
-        for paragraph in target_paragraphs:
-            clean_paragraph = re.sub("\[.*?\]", "", paragraph.text)
+        for element in elements:
+            clean_paragraph = re.sub("\[.*?\]", "", element.get_text())
             clean_paragraph = clean_paragraph.replace("\n", " ")
             all_text_content = ' '.join([all_text_content, clean_paragraph])
         doc = self.nlp(all_text_content.lower())
@@ -46,8 +43,8 @@ class Puppy:
         for sentence in sentences:
             if not sentence:
                 continue
-            soupy_sentence = bs(sentence, features="html.parser")
-            clean_sentence = soupy_sentence.get_text().replace("\n", " ")
+            sentence_soup = bs(sentence, "html.parser")
+            clean_sentence = sentence_soup.get_text().replace("\n", " ")
             doc = self.nlp(clean_sentence.lower())
             tokenized_sentence = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
             if not tokenized_sentence:
@@ -75,27 +72,26 @@ class Puppy:
             sentences_map[clean_links] = similarity
         return sentences_map
 
-    def generate_paragraph_map(self):
-        content_paragraphs = self.driver.find_elements(By.CSS_SELECTOR, ".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+    def generate_paragraph_map(self, current_article_soup):
+        content_paragraphs = current_article_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         paragraph_map = dict()
         for paragraph in content_paragraphs:
-            if paragraph.find_elements(By.TAG_NAME, "a"):
-                clean_paragraph_html = re.sub("\[.*?\]", "", paragraph.get_attribute("innerHTML"))
+            if paragraph.find_all("a"):
+                clean_paragraph_html = re.sub("\[.*?\]", "", paragraph.get("innerHTML"))
                 sentences_map = self.generate_sentence_map(clean_paragraph_html)
                 if not sentences_map:
                     continue
-                clean_paragraph = re.sub("\[.*?\]", "", paragraph.text.replace("\n", " ")) 
+                clean_paragraph = re.sub("\[.*?\]", "", paragraph.get_text().replace("\n", " ")) 
                 doc = self.nlp(clean_paragraph.lower())
                 tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
                 paragraph_map[paragraph] = {"sim": similarity, "sents_map": sentences_map}
         return paragraph_map
 
-    def find_target(self):
-        anchors = self.driver.find_elements(By.TAG_NAME, "a")
+    def find_target(self, all_article_anchors):
         for anchor in anchors:
-            link = anchor.get_attribute("href")
-            if not link or "/en.wikipedia.org/wiki/" not in link:
+            link = anchor.get("href")
+            if not link or not link.startswith("/wiki/"):
                 continue
             link = urllib.parse.unquote(link)
             if self.target == link:
@@ -103,10 +99,10 @@ class Puppy:
         return False
 
     def clean_link(self, link):
-        if not link or "/en.wikipedia.org/wiki/" not in link:
+        if not link or not link.startswith("/wiki/"):
             return None
         link = urllib.parse.unquote(link)
-        new_article_id = link.split("/")[4]
+        new_article_id = link.split("/")[2]
         if new_article_id == "Main_Page" or new_article_id == self.target_id or "#" in new_article_id or "?" in new_article_id or ":" in new_article_id:
             return None
         return link
@@ -117,9 +113,9 @@ class Puppy:
         sents_map = paragraph_map[max_p]["sents_map"]
         max_urls = max(sents_map, key=sents_map.get)
         similarity = "{:.2f}".format(sents_map[max_urls])
-        url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
+        url_decoded_current_url = urllib.parse.unquote(self.current_url)
         viable_articles = []
-        current_page_id = url_decoded_current_url.split("/")[4]
+        current_page_id = url_decoded_current_url.split("/")[2]
         print(f"[+] primary search found these: {max_urls}")
         for url in max_urls:
             valid_link = self.clean_link(url)
@@ -127,14 +123,18 @@ class Puppy:
                 viable_articles.append(valid_link)
         print(f"[+] {len(viable_articles)} viable articles found @ page {url_decoded_current_url} (similarity ~ {similarity})")
         if not self.history or not self.history[-1] == current_page_id:
-            self.history.append(current_page_id)
+            self.history.append(self.current_page_id)
         return viable_articles
 
     def run(self):
         self.tokenized_target = self.get_tokenized_target()
         self.driver.get(self.start)
         while True:
-            target_found = self.find_target()
+            time.sleep(0.5)
+            response = requests.get(self.current_url)
+            current_article_soup = bs(response.text, "html.parser")
+            all_anchors = current_article_soup.find_all("a")
+            target_found = self.find_target(all_anchors)
             if target_found:
                 url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
                 current_page_id = url_decoded_current_url.split("/")[4]
