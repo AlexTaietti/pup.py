@@ -117,19 +117,23 @@ class Puppy:
             target_found = self.find_target(all_anchors)
             if target_found:
                 self.history.extend([self.current_url, self.target])
-                return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
+                success_log = f"[*] Good boy! 🐶 fetched the target in {len(self.history)} hops!\n[*] {self.history}"
+                print(success_log)
+                return {"result": success_log}
             paragraphs = self.generate_paragraph_map(current_article_soup)
+            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             best_paragraph, viable_articles = self.get_best_links(paragraphs)
             if viable_articles:
+                print(f"[+] following is the most promising paragraph found @ {self.current_url}:\n«{best_paragraph.get_text().strip()}»")
                 best_link = random.choice(viable_articles)
                 if self.history.count(best_link) > 3:
                     print(f"[!] loop detected! Puppy has visited {best_link} more than 3 times already during this run")
-                    print(f"[!] banning {best_link} and going back to the start...")
+                    print(f"[!] banning {best_link} and going back to the starting page...")
                     self.skip.append(best_link)
                     best_link = self.start
                 print(f"[+] next stop is {best_link}")
-                print(f"[+] found here:\n“{best_paragraph.get_text().strip()}”")
                 self.current_url = best_link
+                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
                 continue
             print("[!] Puppy got completely lost, going back to the beginning...")
             self.current_url = self.start
