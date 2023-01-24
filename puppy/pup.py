@@ -2,9 +2,8 @@ import time
 import random
 import sys
 import re
-import urllib.parse
-import pprint
 import spacy
+import urllib.parse
 import requests
 
 from bs4 import BeautifulSoup as bs
@@ -22,17 +21,18 @@ class Puppy:
         self.history = list()
         self.tokenized_target = None
 
+    def tokenize(self, text):
+        lowercase_text = text.lower()
+        doc = self.nlp(lowercase_text)
+        doc = self.nlp(' '.join([token.text if token.pos_ == "PROPN" else token.lemma_ for token in doc if token.pos_ == "NOUN"]))
+        return doc
+
     def get_tokenized_target(self):
         response = requests.get(self.target)
         target_soup = bs(response.text, 'html.parser')
         elements = target_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
-        all_text_content = ''
-        for element in elements:
-            clean_paragraph = re.sub("\[.*?\]", "", element.get_text())
-            clean_paragraph = clean_paragraph.replace("\n", " ")
-            all_text_content = ' '.join([all_text_content, clean_paragraph])
-        doc = self.nlp(all_text_content.lower())
-        tokenized_target = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
+        all_text_content = ' '.join([element.get_text() for element in elements])
+        tokenized_target = self.tokenize(all_text_content)
         return tokenized_target
 
     def generate_sentence_map(self, inner_html):
@@ -42,9 +42,7 @@ class Puppy:
             if not sentence:
                 continue
             sentence_soup = bs(sentence, "html.parser")
-            clean_sentence = sentence_soup.get_text().replace("\n", " ").strip()
-            doc = self.nlp(clean_sentence.lower())
-            tokenized_sentence = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
+            tokenized_sentence = self.tokenize(sentence_soup.get_text())
             similarity = tokenized_sentence.similarity(self.tokenized_target)
             sentence_anchors = sentence_soup.find_all("a")
             if not sentence_anchors:
@@ -66,15 +64,14 @@ class Puppy:
         content_paragraphs = current_article_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         paragraph_map = dict()
         for paragraph in content_paragraphs:
-            if paragraph.find_all("a"):
+            if paragraph.find("a"):
                 paragraph_html = paragraph.decode_contents().strip()
-                clean_paragraph_html = re.sub("\[.*?\]", "", paragraph_html)
-                sentences_map = self.generate_sentence_map(clean_paragraph_html)
+                if not paragraph_html:
+                    continue
+                sentences_map = self.generate_sentence_map(paragraph_html)
                 if not sentences_map:
                     continue
-                clean_paragraph = re.sub("\[.*?\]", "", paragraph.get_text().replace("\n", " ")) 
-                doc = self.nlp(clean_paragraph.lower())
-                tokenized_paragraph = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
+                tokenized_paragraph = self.tokenize(paragraph.get_text())
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
                 paragraph_map[paragraph] = {"sim": similarity, "sents_map": sentences_map}
         return paragraph_map
@@ -85,7 +82,7 @@ class Puppy:
             if not link or not link.startswith("/wiki/"):
                 continue
             link = urllib.parse.unquote(link)
-            if link in self.target:
+            if self.target.endswith(link):
                 return True
         return False
 
@@ -103,10 +100,11 @@ class Puppy:
         sents_map = paragraph_map[max_p]["sents_map"]
         max_urls = max(sents_map, key=sents_map.get)
         similarity = "{:.2f}".format(sents_map[max_urls])
-        print(f"[+] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})")
+        print(f"[*] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})")
         if not self.history or not self.history[-1] == self.current_url:
             self.history.append(self.current_url)
         return max_p, max_urls
+
 
     def run(self):
         self.tokenized_target = self.get_tokenized_target()
