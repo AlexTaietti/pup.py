@@ -19,8 +19,6 @@ class Puppy:
     def __init__(self, start, target):
         self.current_url = self.start = start
         self.target = target
-        self.start_id = start.split("/")[4]
-        self.target_id = target.split("/")[4]
         self.history = list()
         self.tokenized_target = None
 
@@ -44,31 +42,23 @@ class Puppy:
             if not sentence:
                 continue
             sentence_soup = bs(sentence, "html.parser")
-            clean_sentence = sentence_soup.get_text().replace("\n", " ")
+            clean_sentence = sentence_soup.get_text().replace("\n", " ").strip()
             doc = self.nlp(clean_sentence.lower())
             tokenized_sentence = self.nlp(' '.join([str(token) for token in doc if token.pos_ in ["NOUN", "PROPN"]]))
-            if not tokenized_sentence:
-                continue
             similarity = tokenized_sentence.similarity(self.tokenized_target)
-            sentence_anchors = soupy_sentence.find_all("a")
+            sentence_anchors = sentence_soup.find_all("a")
             if not sentence_anchors:
                 continue
             sentence_links = []
             for anchor in sentence_anchors:
                 url = anchor.get("href")
-                if not url or not url.startswith("/wiki/"):
+                url = self.clean_link(url)
+                if not url:
                     continue
-                url = f"https://en.wikipedia.org{urllib.parse.unquote(url)}"
                 sentence_links.append(url)
-            clean_links = []
-            for link in sentence_links:
-                link = self.clean_link(link)
-                if not link:
-                    continue
-                clean_links.append(link)
-            if not clean_links:
+            if not sentence_links:
                 continue
-            clean_links = tuple(clean_links)
+            clean_links = tuple(sentence_links)
             sentences_map[clean_links] = similarity
         return sentences_map
 
@@ -77,7 +67,8 @@ class Puppy:
         paragraph_map = dict()
         for paragraph in content_paragraphs:
             if paragraph.find_all("a"):
-                clean_paragraph_html = re.sub("\[.*?\]", "", paragraph.get("innerHTML"))
+                paragraph_html = paragraph.decode_contents().strip()
+                clean_paragraph_html = re.sub("\[.*?\]", "", paragraph_html)
                 sentences_map = self.generate_sentence_map(clean_paragraph_html)
                 if not sentences_map:
                     continue
@@ -89,12 +80,12 @@ class Puppy:
         return paragraph_map
 
     def find_target(self, all_article_anchors):
-        for anchor in anchors:
+        for anchor in all_article_anchors:
             link = anchor.get("href")
             if not link or not link.startswith("/wiki/"):
                 continue
             link = urllib.parse.unquote(link)
-            if self.target == link:
+            if link in self.target:
                 return True
         return False
 
@@ -102,10 +93,9 @@ class Puppy:
         if not link or not link.startswith("/wiki/"):
             return None
         link = urllib.parse.unquote(link)
-        new_article_id = link.split("/")[2]
-        if new_article_id == "Main_Page" or new_article_id == self.target_id or "#" in new_article_id or "?" in new_article_id or ":" in new_article_id:
+        if "Main_Page" in link or link in self.target or "#" in link or "?" in link or ":" in link:
             return None
-        return link
+        return f"https://en.wikipedia.org{link}"
 
     def get_best_links(self, paragraph_map):
         anchors = []
@@ -113,22 +103,14 @@ class Puppy:
         sents_map = paragraph_map[max_p]["sents_map"]
         max_urls = max(sents_map, key=sents_map.get)
         similarity = "{:.2f}".format(sents_map[max_urls])
-        url_decoded_current_url = urllib.parse.unquote(self.current_url)
-        viable_articles = []
-        current_page_id = url_decoded_current_url.split("/")[2]
-        print(f"[+] primary search found these: {max_urls}")
-        for url in max_urls:
-            valid_link = self.clean_link(url)
-            if valid_link:
-                viable_articles.append(valid_link)
-        print(f"[+] {len(viable_articles)} viable articles found @ page {url_decoded_current_url} (similarity ~ {similarity})")
-        if not self.history or not self.history[-1] == current_page_id:
-            self.history.append(self.current_page_id)
-        return viable_articles
+        print(f"[+] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})")
+        if not self.history or not self.history[-1] == self.current_url:
+            self.history.append(self.current_url)
+        return max_p, max_urls
 
     def run(self):
         self.tokenized_target = self.get_tokenized_target()
-        self.driver.get(self.start)
+        self.current_url = self.start
         while True:
             time.sleep(0.5)
             response = requests.get(self.current_url)
@@ -136,19 +118,18 @@ class Puppy:
             all_anchors = current_article_soup.find_all("a")
             target_found = self.find_target(all_anchors)
             if target_found:
-                url_decoded_current_url = urllib.parse.unquote(self.driver.current_url)
-                current_page_id = url_decoded_current_url.split("/")[4]
-                self.history.append([current_page_id, self.target_id])
-                self.kill_driver()
+                self.history.append([self.current_url, self.target])
                 return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
-            paragraphs = self.generate_paragraph_map()
-            viable_articles = self.get_best_links(paragraphs)
+            paragraphs = self.generate_paragraph_map(current_article_soup)
+            best_paragraph, viable_articles = self.get_best_links(paragraphs)
             if viable_articles:
                 best_link = random.choice(viable_articles)
-                self.driver.get(best_link)
+                print(f"[+] next stop is {best_link}")
+                print(f"[+] found here:\n{best_paragraph.get_text().strip()}")
+                self.current_url = best_link
                 continue
             print("[!] Puppy got completely lost, going back to the beginning...")
-            self.driver.get(self.start)
+            self.current_url = self.start
 
 
 if __name__ == "__main__":
