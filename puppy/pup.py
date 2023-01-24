@@ -109,7 +109,6 @@ class Puppy:
             self.history.append(self.current_url)
         return max_p, max_urls
 
-
     def run(self):
         self.tokenized_target = self.get_tokenized_target()
         self.current_url = self.start
@@ -120,23 +119,21 @@ class Puppy:
             all_anchors = current_article_soup.find_all("a")
             target_found = self.find_target(all_anchors)
             if target_found:
-                self.history.append([self.current_url, self.target])
+                self.history.extend([self.current_url, self.target])
                 return {"result": f"[*] Good boy! 🐶 fetched the target!\n[*] hops -> {self.history}"}
             paragraphs = self.generate_paragraph_map(current_article_soup)
             best_paragraph, viable_articles = self.get_best_links(paragraphs)
             if viable_articles:
                 best_link = random.choice(viable_articles)
+                if self.history.count(best_link) > 3:
+                    print(f"[!] loop detected! Puppy has visited {best_link} more than 3 times already during this run")
+                    print(f"[!] banning {best_link} and going back to the start...")
+                    self.skip.append(best_link)
+                    best_link = self.start
                 print(f"[+] next stop is {best_link}")
-                print(f"[+] found here:\n{best_paragraph.get_text().strip()}")
+                print(f"[+] found here:\n“{best_paragraph.get_text().strip()}”")
                 self.current_url = best_link
                 continue
             print("[!] Puppy got completely lost, going back to the beginning...")
             self.current_url = self.start
-
-
-if __name__ == "__main__":
-    puppy = Puppy(sys.argv[1].strip(), sys.argv[2].strip())
-    puppy.target_freq = puppy.get_target_tokens_freq("https://en.wikipedia.org/wiki/Lionel_Messi")
-    fit = puppy.generate_paragraph_map("https://en.wikipedia.org/wiki/Cristiano_Ronaldo")
-    best_links = puppy.get_best_links(fit)
 
