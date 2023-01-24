@@ -19,7 +19,7 @@ class Puppy:
         self.current_url = self.start = start
         self.target = target
         self.history = list()
-        self.tokenized_target = None
+        self.tokenized_target = self.get_tokenized_target()
         self.skip = list()
 
     def tokenize(self, text):
@@ -105,13 +105,10 @@ class Puppy:
         max_urls = max(sents_map, key=sents_map.get)
         similarity = "{:.2f}".format(sents_map[max_urls])
         print(f"[*] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})")
-        if not self.history or not self.history[-1] == self.current_url:
-            self.history.append(self.current_url)
+        self.history.append(self.current_url)
         return max_p, max_urls
 
     def run(self):
-        self.tokenized_target = self.get_tokenized_target()
-        self.current_url = self.start
         while True:
             time.sleep(0.5)
             response = requests.get(self.current_url)
