@@ -43,11 +43,11 @@ class Puppy:
             if not sentence:
                 continue
             sentence_soup = bs(sentence, "html.parser")
-            tokenized_sentence = self.tokenize(sentence_soup.get_text())
-            similarity = tokenized_sentence.similarity(self.tokenized_target)
             sentence_anchors = sentence_soup.find_all("a")
             if not sentence_anchors:
                 continue
+            tokenized_sentence = self.tokenize(sentence_soup.get_text())
+            similarity = tokenized_sentence.similarity(self.tokenized_target)
             sentence_links = []
             for anchor in sentence_anchors:
                 url = anchor.get("href")
