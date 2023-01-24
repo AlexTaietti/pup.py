@@ -20,6 +20,7 @@ class Puppy:
         self.target = target
         self.history = list()
         self.tokenized_target = None
+        self.skip = list()
 
     def tokenize(self, text):
         lowercase_text = text.lower()
@@ -92,7 +93,10 @@ class Puppy:
         link = urllib.parse.unquote(link)
         if "Main_Page" in link or link in self.target or "#" in link or "?" in link or ":" in link:
             return None
-        return f"https://en.wikipedia.org{link}"
+        link = f"https://en.wikipedia.org{link}"
+        if link in self.skip:
+            return None
+        return link
 
     def get_best_links(self, paragraph_map):
         anchors = []
