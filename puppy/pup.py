@@ -130,6 +130,7 @@ class Puppy:
                     print(f"[!] loop detected! Puppy has visited {best_link} more than 3 times already during this run")
                     print(f"[!] banning {best_link} and going back to the starting page...")
                     self.skip.append(best_link)
+                    self.history = []
                     best_link = self.start
                 print(f"[+] next stop is {best_link}")
                 self.current_url = best_link
