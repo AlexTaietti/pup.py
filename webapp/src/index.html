@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>pup.py</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+	  <main class="content">
+		  <h1>🐶 pup.py 🐶</h1>
+		  <form class="input-form" id="form">
+			  <div class="input-container">
+			  	<label for="start">Start</label>
+			  	<input type="text" id="start" name="start">
+			  </div>
+			  <div class="input-container">
+			  	<label for="target">Target</label>
+			  	<input type="text" id="target" name="target">
+			  </div>
+			  <input class="start-button" type="button" value="Let's go!" onclick="submitForm()">
+		  </form>
+		  <p class="updates-display" id="result"></p>
+	  </main>
+  </body>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" integrity="sha384-/KNQL8Nu5gCHLqwqfQjA689Hhoqgi2S84SNUxC3roTe4EhJ9AfLkp8QiQcU8AMzI" crossorigin="anonymous"></script>
+  <script src="js/index.js"></script>
+</html>
+
