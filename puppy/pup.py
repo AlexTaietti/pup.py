@@ -111,7 +111,7 @@ class Puppy:
 
     def run(self):
         while True:
-            time.sleep(0.5)
+            time.sleep(0.3)
             response = requests.get(self.current_url)
             current_article_soup = bs(response.text, "html.parser")
             all_anchors = current_article_soup.find_all("a")
