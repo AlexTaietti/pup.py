@@ -122,6 +122,13 @@ class Puppy:
                 print(success_log)
                 return {"result": success_log}
             paragraphs = self.generate_paragraph_map(current_article_soup)
+            if not paragraphs:
+                print(f"[!] no viable paragraphs detected @ {self.current_url}")
+                print(f"[!] banning {self.current_url} and going back to the starting page...")
+                self.skip.append(self.current_url)
+                self.history = []
+                self.current_url = self.start
+                continue
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             best_paragraph, viable_articles = self.get_best_links(paragraphs)
             if viable_articles:
