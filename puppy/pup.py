@@ -25,7 +25,8 @@ class Puppy:
     def tokenize(self, text):
         lowercase_text = text.lower()
         doc = self.nlp(lowercase_text)
-        doc = self.nlp(' '.join([token.text if token.pos_ == "PROPN" else token.lemma_ for token in doc if token.pos_ == "NOUN"]))
+        dirt = re.compile(r"\.|\[.*?]|\(.*?\)|[1-9]*$|{.*?}")
+        doc = self.nlp(' '.join([re.sub(dirt, '', token.text) if token.pos_ == "PROPN" else re.sub(dirt, '', token.lemma_) for token in doc if token.pos_ == "NOUN"]))
         return doc
 
     def get_tokenized_target(self):
