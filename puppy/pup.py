@@ -106,11 +106,69 @@ class Puppy:
         sents_map = paragraph_map[max_p]["sents_map"]
         max_urls = max(sents_map, key=sents_map.get)
         similarity = "{:.2f}".format(sents_map[max_urls])
-        print(f"[*] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})")
         self.history.append(self.current_url)
-        return max_p, max_urls
+        return max_p, max_urls, similarity
 
-    def run(self):
+    def make_update(self, best_paragraph, max_urls, best_link, similarity):
+        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        message += f"[*] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})\n"
+        message += f"[+] following is the most promising paragraph found @ {self.current_url}:\n"
+        message += f"«{best_paragraph.get_text().strip()}»\n"
+        message += f"[+] next stop is {best_link}\n"
+        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        print(message)
+        update_data = {
+            "paragraph": f"«{best_paragraph.get_text().strip()}»",
+            "links_n": len(max_urls),
+            "best_link": best_link,
+            "similarity": similarity,
+            "current_url": self.current_url
+        }
+        update = {
+                "type": "INFO",
+                "data": update_data
+        }
+        return update
+
+    def make_loop_failure(self):
+        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        message += f"[!] loop detected @ {self.current_url}\n"
+        message += f"[!] banning {self.current_url} and going back to the starting page...\n"
+        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        print(message)
+        update_data = { "current_url": self.current_url }
+        update = {
+            "type": "LOOP",
+            "data": update_data
+        }
+        return update
+
+
+    def make_viable_paragraph_failure(self):
+        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        message += f"[!] no viable paragraphs detected @ {self.current_url}\n"
+        message += f"[!] banning {self.current_url} and going back to the starting page...\n"
+        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        print(message)
+        update_data = { "current_url": self.current_url }
+        update = {
+            "type": "PARAGRAPH_ERROR",
+            "data": update_data
+        }
+        return update
+
+    def make_failure_update(self):
+        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        message += "[!] Puppy got completely lost, going back to the beginning...\n"
+        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        print(message)
+        update = {
+                "type": "LOST",
+                update_data: None
+        }
+        return update
+
+    def run(self, socketio):
         while True:
             time.sleep(0.3)
             response = requests.get(self.current_url)
@@ -120,31 +178,30 @@ class Puppy:
             if target_found:
                 self.history.extend([self.current_url, self.target])
                 success_log = f"[*] Good boy! 🐶 fetched the target in {len(self.history)} hops!\n[*] {self.history}"
-                print(success_log)
                 return {"result": success_log}
             paragraphs = self.generate_paragraph_map(current_article_soup)
             if not paragraphs:
-                print(f"[!] no viable paragraphs detected @ {self.current_url}")
-                print(f"[!] banning {self.current_url} and going back to the starting page...")
+                update = self.make_viable_paragraph_failure()
+                socketio.emit("puppy live update", {"update": update})
                 self.skip.append(self.current_url)
                 self.history = []
                 self.current_url = self.start
                 continue
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            best_paragraph, viable_articles = self.get_best_links(paragraphs)
+            best_paragraph, viable_articles, similarity = self.get_best_links(paragraphs)
             if viable_articles:
-                print(f"[+] following is the most promising paragraph found @ {self.current_url}:\n«{best_paragraph.get_text().strip()}»")
                 best_link = random.choice(viable_articles)
                 if self.history.count(best_link) > 3:
-                    print(f"[!] loop detected! Puppy has visited {best_link} more than 3 times already during this run")
-                    print(f"[!] banning {best_link} and going back to the starting page...")
+                    update = make_loop_failure()
                     self.skip.append(best_link)
                     self.history = []
-                    best_link = self.start
-                print(f"[+] next stop is {best_link}")
+                    socketio.emit("puppy live update", {"update": update})
+                    self.current_url = self.start
+                    continue
+                update = self.make_update(best_paragraph, viable_articles, best_link, similarity)
                 self.current_url = best_link
-                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+                socketio.emit("puppy live update", {"update": update})
                 continue
-            print("[!] Puppy got completely lost, going back to the beginning...")
+            update = self.make_failure_update()
+            socketio.emit("puppy live update", {"update": update})
             self.current_url = self.start
 
