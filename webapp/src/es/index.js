@@ -8,7 +8,7 @@ const createInfoFragment = (data) => {
 	const nextArticle = document.createElement("a")
 	const paragraph = document.createElement("p")
 	const info = document.createElement("p")
-	
+
 	currentArticle.href = currentArticle.textContent = data["current_url"]
 	nextArticle.href = nextArticle.textContent = data["best_link"]
 
