@@ -13,6 +13,7 @@ def home():
 
 @socketio.on('connect')
 def test_connect():
+    print(f"[*] server: connection received from socket {request.sid}")
     socketio.emit('connected',  {'data':'🐶🐶🐶'})
 
 
@@ -20,7 +21,7 @@ def test_connect():
 def fetch_target(data):
     start = data["start"]
     target = data["target"]
-    pupper = pup.Puppy(start, target, socketio)
+    pupper = pup.Puppy(start, target, socketio, request.sid)
     pupper.run()
 
 socketio.run(app)
