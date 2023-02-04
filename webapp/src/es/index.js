@@ -1,30 +1,55 @@
 const resultDisplay = document.getElementById("result") 
 const socket = io.connect('http://127.0.0.1:5000')
 
-const createInfoFragment = (data) => {
+const createInfoItem = (data) => {
 	
-	const DOMFragment = document.createDocumentFragment()
+	const updateItem = document.createDocumentFragment()
+	
 	const currentArticle = document.createElement("a")
-	const nextArticle = document.createElement("a")
+	
 	const paragraph = document.createElement("p")
-	const info = document.createElement("p")
-
-	currentArticle.href = currentArticle.textContent = data["current_url"]
-	nextArticle.href = nextArticle.textContent = data["best_link"]
-
-	paragraph.textContent = data["paragraph"]
 	paragraph.classList.add("best-paragraph")
+	
+	const similarity = document.createElement("p")
+	similarity.classList.add("similarity")
+	
+	const header = document.createElement("p")
+	header.classList.add("header")
 
-	const linksNumber = document.createTextNode(data["links_n"])
-	const similarity = document.createTextNode(data["similarity"])
+	currentArticle.href = data["current_url"]
+	currentArticle.textContent = data["current_url"].split("/").pop().split("_").toString().toLowerCase().split(",").join(" ")
 
-	info.appendChild(linksNumber)
-	info.appendChild(similarity)
-	info.appendChild(currentArticle)
-	info.appendChild(nextArticle)
+	header.textContent = "From "
+	header.appendChild(currentArticle)
 
-	DOMFragment.appendChild(paragraph)
-	DOMFragment.appendChild(info)
+	paragraph.textContent = `“${data["paragraph"]}”`
+	similarity.textContent = `This paragraph's similarity score is ~${data["similarity"]}`
+
+	updateItem.appendChild(header)
+	updateItem.appendChild(paragraph)
+	updateItem.appendChild(similarity)
+
+	return updateItem
+
+}
+
+const createLoopItem = (data) => {
+
+	const DOMFragment = document.createDocumentFragment()
+
+	const exclamation = document.createElement("span")
+	exclamation.textContent = "!"
+	const text = document.createElement("p")
+	text.textContent = "Oh no! Puppy got stuck in a loop here "
+	const stuckPageLink = document.createElement("a")
+	stuckPageLink.href = data["current_url"]
+	stuckPageLink.textContent = data["current_url"].split("/").pop().split("_").toString().toLowerCase().split(",").join(" ")
+	text.appendChild(stuckPageLink)
+	const moreText = document.createTextNode(", going back to the starting page...")
+	text.appendChild(moreText)
+
+	DOMFragment.appendChild(exclamation)
+	DOMFragment.appendChild(text)
 
 	return DOMFragment
 
@@ -33,19 +58,23 @@ const createInfoFragment = (data) => {
 const showUpdate = (update) => {
 
 	const updateObject = update["update"]
-	
-	let DOMFragment
+	const updateItem = document.createElement("li")
+        updateItem.classList.add("update-container")
 
 	if (updateObject["type"] == "INFO"){
-		DOMFragment = createInfoFragment(updateObject["data"])
+		const fragment = createInfoItem(updateObject["data"])
+		updateItem.classList.add("info")
+		updateItem.appendChild(fragment)
+	} else if (updateObject["type"] == "LOOP") {
+		const fragment = createLoopItem(updateObject["data"])
+		updateItem.classList.add("loop")
+                updateItem.appendChild(fragment)
 	} else {
 		console.log(updateObject["data"])
+		return
 	}
 
-	const updateElement = document.createElement("li")
-	updateElement.classList.add("update-entry")
-	updateElement.append(DOMFragment)
-        resultDisplay.appendChild(updateElement)
+        resultDisplay.appendChild(updateItem)
 
 }
 

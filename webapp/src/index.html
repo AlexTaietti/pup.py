@@ -4,20 +4,22 @@
     <title>pup.py</title>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Playfair+Display">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins">
   </head>
   <body>
 	  <main class="content">
-		  <h1>🐶 pup.py 🐶</h1>
+		  <h1>🐶 Pup.py 🐶</h1>
 		  <form class="input-form" id="form">
 			  <div class="input-container">
 			  	<label for="start">Start</label>
 			  	<input type="text" id="start" name="start">
 			  </div>
+			  <input class="start-button" type="button" value="Let's go!" onclick="submitForm()">
 			  <div class="input-container">
 			  	<label for="target">Target</label>
 			  	<input type="text" id="target" name="target">
 			  </div>
-			  <input class="start-button" type="button" value="Let's go!" onclick="submitForm()">
 		  </form>
 		  <ul class="updates-display" id="result"></ul>
 	  </main>
