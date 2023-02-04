@@ -3,26 +3,30 @@ import random
 import sys
 import re
 import urllib.parse
-import requests
 
 from bs4 import BeautifulSoup as bs
 from selenium import webdriver
 from puppy.utils.nlp import tokenize
-
+from puppy.utils.http import politely_get
 
 class Puppy:
 
-    def __init__(self, start, target, websocket):
+    def __init__(self, start, target, websocket, client_sid):
         self.current_url = self.start = start
         self.target = target
         self.history = list()
         self.tokenized_target = self.get_tokenized_target()
         self.skip = list()
         self.websocket = websocket
+        self.client_sid = client_sid
+
+    def emit_update(self, update_data):
+        self.websocket.emit("puppy live update", {"update": update_data}, to=self.client_sid)
+        
 
     def get_tokenized_target(self):
-        response = requests.get(self.target)
-        target_soup = bs(response.text, 'html.parser')
+        response_text = politely_get(self.target)
+        target_soup = bs(response_text, 'html.parser')
         elements = target_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         all_text_content = ' '.join([element.get_text() for element in elements])
         tokenized_target = tokenize(all_text_content)
@@ -30,7 +34,7 @@ class Puppy:
 
     def generate_sentence_map(self, inner_html):
         sentences = re.split(r"(\.( |$|<)|!|\?)(?![^<]*>)", inner_html)
-        sentences_map = dict()
+        sentences_2_similarity = dict()
         for sentence in sentences:
             if not sentence:
                 continue
@@ -51,24 +55,24 @@ class Puppy:
             if not sentence_links:
                 continue
             viable_links = tuple(sentence_links)
-            sentences_map[viable_links] = similarity
-        return sentences_map
+            sentences_2_similarity[viable_links] = similarity
+        return sentences_2_similarity
 
     def generate_paragraph_map(self, current_article_soup):
         content_paragraphs = current_article_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
-        paragraph_map = dict()
+        paragraph_2_sentences = dict()
         for paragraph in content_paragraphs:
             if paragraph.find("a"):
                 paragraph_html = paragraph.decode_contents().strip()
                 if not paragraph_html:
                     continue
-                sentences_map = self.generate_sentence_map(paragraph_html)
-                if not sentences_map:
+                sentences_2_similarity = self.generate_sentence_map(paragraph_html)
+                if not sentences_2_similarity:
                     continue
                 tokenized_paragraph = tokenize(paragraph.get_text())
                 similarity = tokenized_paragraph.similarity(self.tokenized_target)
-                paragraph_map[paragraph] = {"similarity": similarity, "sentences_map": sentences_map}
-        return paragraph_map
+                paragraph_2_sentences[paragraph] = {"similarity": similarity, "sentences_map": sentences_2_similarity}
+        return paragraph_2_sentences
 
     def find_target(self, all_article_anchors):
         for anchor in all_article_anchors:
@@ -91,121 +95,78 @@ class Puppy:
             return None
         return link
 
-    def get_best_links(self, paragraph_map):
+    def get_best_links(self, paragraph_2_sentences):
         anchors = []
-        best_paragraph = max(paragraph_map, key=lambda paragraph: paragraph_map[paragraph]['similarity'])
-        sentences_map = paragraph_map[best_paragraph]["sentences_map"]
-        best_urls = max(sentences_map, key=sentences_map.get)
-        similarity = "{:.2f}".format(sentences_map[best_urls])
+        best_paragraph = max(paragraph_2_sentences, key=lambda paragraph: paragraph_2_sentences[paragraph]['similarity'])
+        sentences_2_similarity = paragraph_2_sentences[best_paragraph]["sentences_map"]
+        best_urls = max(sentences_2_similarity, key=sentences_2_similarity.get)
+        similarity = "{:.2f}".format(sentences_2_similarity[best_urls])
         self.history.append(self.current_url)
         return best_paragraph, best_urls, similarity
 
     def make_success_update(self, success_message):
-        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        message += success_message
-        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        print(message)
         update_data = { "result": success_message }
-        update = {
-                "type": "SUCCESS",
-                "data" : update_data
-        }
+        update = { "type": "SUCCESS", "data" : update_data }
         return update
 
     def make_update(self, best_paragraph, max_urls, best_link, similarity):
-        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        message += f"[*] {len(max_urls)} viable articles found @ page {self.current_url} (similarity ~ {similarity})\n"
-        message += f"[+] following is the most promising paragraph found @ {self.current_url}:\n"
-        message += f"«{best_paragraph.get_text().strip()}»\n"
-        message += f"[+] next stop is {best_link}\n"
-        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        print(message)
         update_data = {
-            "paragraph": best_paragraph.get_text().strip(),
-            "links_n": len(max_urls),
-            "best_link": best_link,
+            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph.get_text().strip()),
             "similarity": similarity,
             "current_url": self.current_url
         }
-        update = {
-                "type": "INFO",
-                "data": update_data
-        }
+        update = { "type": "INFO", "data": update_data }
         return update
 
     def make_loop_failure(self):
-        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        message += f"[!] loop detected @ {self.current_url}\n"
-        message += f"[!] banning {self.current_url} and going back to the starting page...\n"
-        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        print(message)
         update_data = { "current_url": self.current_url }
-        update = {
-            "type": "LOOP",
-            "data": update_data
-        }
+        update = { "type": "LOOP", "data": update_data }
         return update
 
 
     def make_viable_paragraph_failure(self):
-        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        message += f"[!] no viable paragraphs detected @ {self.current_url}\n"
-        message += f"[!] banning {self.current_url} and going back to the starting page...\n"
-        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        print(message)
         update_data = { "current_url": self.current_url }
-        update = {
-            "type": "PARAGRAPH_ERROR",
-            "data": update_data
-        }
+        update = { "type": "PARAGRAPH_ERROR", "data": update_data }
         return update
 
     def make_failure_update(self):
-        message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        message += "[!] Puppy got completely lost, going back to the beginning...\n"
-        message += "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
-        print(message)
-        update = {
-                "type": "LOST",
-                "data": None
-        }
+        update = { "type": "LOST", "data": None }
         return update
 
     def run(self):
         while True:
-            time.sleep(0.3)
-            response = requests.get(self.current_url)
-            current_article_soup = bs(response.text, "html.parser")
+            response_text = politely_get(self.current_url)
+            current_article_soup = bs(response_text, "html.parser")
             all_anchors = current_article_soup.find_all("a")
             target_found = self.find_target(all_anchors)
             if target_found:
                 self.history.extend([self.current_url, self.target])
-                success_message = f"[*] Good boy! 🐶 fetched the target in {len(self.history)} hops!\n[*] {self.history}"
+                success_message = '->'.join(self.history)
                 update = self.make_success_update(success_message)
-                return self.websocket.emit("puppy live update", {"update": update})
-            paragraphs = self.generate_paragraph_map(current_article_soup)
-            if not paragraphs:
+                return self.emit_update(update)
+            paragraph_2_sentences = self.generate_paragraph_map(current_article_soup)
+            if not paragraph_2_sentences:
                 update = self.make_viable_paragraph_failure()
-                self.websocket.emit("puppy live update", {"update": update})
+                self.emit_update(update)
                 self.skip.append(self.current_url)
                 self.history = []
                 self.current_url = self.start
                 continue
-            best_paragraph, viable_articles, similarity = self.get_best_links(paragraphs)
+            best_paragraph, viable_articles, similarity = self.get_best_links(paragraph_2_sentences)
             if viable_articles:
                 best_link = random.choice(viable_articles)
                 if self.history.count(best_link) > 3:
                     update = self.make_loop_failure()
                     self.skip.append(best_link)
                     self.history = []
-                    self.websocket.emit("puppy live update", {"update": update})
+                    self.emit_update(update)
                     self.current_url = self.start
                     continue
                 update = self.make_update(best_paragraph, viable_articles, best_link, similarity)
                 self.current_url = best_link
-                self.websocket.emit("puppy live update", {"update": update})
+                self.emit_update(update)
                 continue
             update = self.make_failure_update()
-            self.websocket.emit("puppy live update", {"update": update})
+            self.emit_update(update)
             self.current_url = self.start
 
