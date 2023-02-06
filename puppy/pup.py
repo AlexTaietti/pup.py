@@ -57,9 +57,11 @@ class Puppy:
             sentences_2_similarity[viable_links] = similarity
         return sentences_2_similarity
 
-    def generate_paragraph_map(self, current_article_soup):
+    def get_best_paragraph(self, current_article_soup):
         content_paragraphs = current_article_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
-        paragraph_2_sentences = dict()
+        best_paragraph = None
+        max_similarity = 0
+        best_sentences = None
         for paragraph in content_paragraphs:
             if paragraph.find("a"):
                 paragraph_html = paragraph.decode_contents().strip()
@@ -68,10 +70,12 @@ class Puppy:
                 sentences_2_similarity = self.generate_sentence_map(paragraph_html)
                 if not sentences_2_similarity:
                     continue
-                tokenized_paragraph = tokenize(paragraph.get_text())
-                similarity = tokenized_paragraph.similarity(self.tokenized_target)
-                paragraph_2_sentences[paragraph] = {"similarity": similarity, "sentences_map": sentences_2_similarity}
-        return paragraph_2_sentences
+                for sentence in sentences_2_similarity:
+                    if sentences_2_similarity[sentence] > max_similarity:
+                        max_similarity = sentences_2_similarity[sentence]
+                        best_paragraph = paragraph
+                        best_sentences = sentences_2_similarity
+        return best_paragraph, best_sentences
 
     def find_target(self, all_article_anchors):
         for anchor in all_article_anchors:
@@ -96,14 +100,11 @@ class Puppy:
             return None
         return link
 
-    def get_best_links(self, paragraph_2_sentences):
-        anchors = []
-        best_paragraph = max(paragraph_2_sentences, key=lambda paragraph: paragraph_2_sentences[paragraph]['similarity'])
-        sentences_2_similarity = paragraph_2_sentences[best_paragraph]["sentences_map"]
-        best_urls = max(sentences_2_similarity, key=sentences_2_similarity.get)
-        similarity = sentences_2_similarity[best_urls]
+    def get_best_links(self, best_sentences):
+        best_urls = max(best_sentences, key=best_sentences.get)
+        similarity = best_sentences[best_urls]
         self.history.append(self.current_url)
-        return best_paragraph, best_urls, similarity
+        return best_urls, similarity
 
     def make_update(self, best_paragraph_text_content, similarity):
         update_data = {
@@ -128,6 +129,25 @@ class Puppy:
         update = { "type": "LOOP", "data": update_data }
         return update
 
+    def end_run(self, target):
+        self.history.extend([self.current_url, self.target])
+        best_paragraph_text = target.parent.text.strip()
+        tokenized_sentence = tokenize(best_paragraph_text)
+        similarity = tokenized_sentence.similarity(self.tokenized_target)
+        update = self.make_success_update(best_paragraph_text, similarity)
+        return self.emit_update(update)
+
+    def loop_check(self, best_link):
+        repetition_count = self.history.count(best_link)
+        if repetition_count > 3:
+            update = self.make_loop_failure()
+            self.skip.append(best_link)
+            self.history = []
+            self.emit_update(update)
+            self.current_url = self.start
+            return True
+        return False
+
     def run(self):
         while True:
             response_text = politely_get(self.current_url)
@@ -135,26 +155,15 @@ class Puppy:
             all_anchors = current_article_soup.find_all("a")
             target_found = self.find_target(all_anchors)
             if target_found:
-                self.history.extend([self.current_url, self.target])
-                best_paragraph_text = target_found.parent.text.strip()
-                tokenized_sentence = tokenize(best_paragraph_text)
-                similarity = tokenized_sentence.similarity(self.tokenized_target)
-                update = self.make_success_update(best_paragraph_text, similarity)
-                return self.emit_update(update)
-            paragraph_2_sentences = self.generate_paragraph_map(current_article_soup)
-            best_paragraph, viable_articles, similarity = self.get_best_links(paragraph_2_sentences)
-            if viable_articles:
-                best_link = random.choice(viable_articles)
-                if self.history.count(best_link) > 3:
-                    update = self.make_loop_failure()
-                    self.skip.append(best_link)
-                    self.history = []
-                    self.emit_update(update)
-                    self.current_url = self.start
+                return self.end_run(target_found)
+            best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
+            best_links, similarity = self.get_best_links(best_sentences)
+            if best_links:
+                best_link = random.choice(best_links)
+                loop = self.loop_check(best_link)
+                if loop:
                     continue
                 best_paragraph_text_content = best_paragraph.get_text().strip()
                 update = self.make_update(best_paragraph_text_content, similarity)
                 self.current_url = best_link
                 self.emit_update(update)
-                continue
-
