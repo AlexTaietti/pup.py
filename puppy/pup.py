@@ -22,7 +22,6 @@ class Puppy:
 
     def emit_update(self, update_data):
         self.websocket.emit("puppy live update", {"update": update_data}, to=self.client_sid)
-        
 
     def get_tokenized_target(self):
         response_text = politely_get(self.target)
@@ -76,12 +75,14 @@ class Puppy:
 
     def find_target(self, all_article_anchors):
         for anchor in all_article_anchors:
+            if anchor.parent.name in ["li"] or not anchor.parent.text:
+                continue
             link = anchor.get("href")
             if not link or not link.startswith("/wiki/"):
                 continue
             link = urllib.parse.unquote(link)
             if self.target.endswith(link):
-                return True
+                return anchor
         return False
 
     def clean_link(self, link):
@@ -100,37 +101,31 @@ class Puppy:
         best_paragraph = max(paragraph_2_sentences, key=lambda paragraph: paragraph_2_sentences[paragraph]['similarity'])
         sentences_2_similarity = paragraph_2_sentences[best_paragraph]["sentences_map"]
         best_urls = max(sentences_2_similarity, key=sentences_2_similarity.get)
-        similarity = "{:.2f}".format(sentences_2_similarity[best_urls])
+        similarity = sentences_2_similarity[best_urls]
         self.history.append(self.current_url)
         return best_paragraph, best_urls, similarity
 
-    def make_success_update(self, success_message):
-        update_data = { "result": success_message }
-        update = { "type": "SUCCESS", "data" : update_data }
-        return update
-
-    def make_update(self, best_paragraph, max_urls, best_link, similarity):
+    def make_update(self, best_paragraph_text_content, similarity):
         update_data = {
-            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph.get_text().strip()),
-            "similarity": similarity,
-            "current_url": self.current_url
+            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph_text_content),
+            "similarity": "{:.2f}".format(similarity),
+            "current_url": self.current_url,
         }
         update = { "type": "INFO", "data": update_data }
+        return update
+
+    def make_success_update(self, best_paragraph_text_content, similarity):
+        update_data = {
+            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph_text_content),
+            "similarity": "{:.2f}".format(similarity),
+            "current_url": self.current_url,
+        }
+        update = { "type": "SUCCESS", "data": update_data }
         return update
 
     def make_loop_failure(self):
         update_data = { "current_url": self.current_url }
         update = { "type": "LOOP", "data": update_data }
-        return update
-
-
-    def make_viable_paragraph_failure(self):
-        update_data = { "current_url": self.current_url }
-        update = { "type": "PARAGRAPH_ERROR", "data": update_data }
-        return update
-
-    def make_failure_update(self):
-        update = { "type": "LOST", "data": None }
         return update
 
     def run(self):
@@ -141,17 +136,12 @@ class Puppy:
             target_found = self.find_target(all_anchors)
             if target_found:
                 self.history.extend([self.current_url, self.target])
-                success_message = '->'.join(self.history)
-                update = self.make_success_update(success_message)
+                best_paragraph_text = target_found.parent.text.strip()
+                tokenized_sentence = tokenize(best_paragraph_text)
+                similarity = tokenized_sentence.similarity(self.tokenized_target)
+                update = self.make_success_update(best_paragraph_text, similarity)
                 return self.emit_update(update)
             paragraph_2_sentences = self.generate_paragraph_map(current_article_soup)
-            if not paragraph_2_sentences:
-                update = self.make_viable_paragraph_failure()
-                self.emit_update(update)
-                self.skip.append(self.current_url)
-                self.history = []
-                self.current_url = self.start
-                continue
             best_paragraph, viable_articles, similarity = self.get_best_links(paragraph_2_sentences)
             if viable_articles:
                 best_link = random.choice(viable_articles)
@@ -162,11 +152,9 @@ class Puppy:
                     self.emit_update(update)
                     self.current_url = self.start
                     continue
-                update = self.make_update(best_paragraph, viable_articles, best_link, similarity)
+                best_paragraph_text_content = best_paragraph.get_text().strip()
+                update = self.make_update(best_paragraph_text_content, similarity)
                 self.current_url = best_link
                 self.emit_update(update)
                 continue
-            update = self.make_failure_update()
-            self.emit_update(update)
-            self.current_url = self.start
 

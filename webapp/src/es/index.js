@@ -70,8 +70,10 @@ const showUpdate = (update) => {
 		updateItem.classList.add("loop")
                 updateItem.appendChild(fragment)
 	} else {
-		console.log(updateObject["data"])
-		return
+		const fragment = createInfoItem(updateObject["data"])
+                updateItem.classList.add("info")
+		updateItem.classList.add("success")
+                updateItem.appendChild(fragment)
 	}
 
         resultDisplay.appendChild(updateItem)

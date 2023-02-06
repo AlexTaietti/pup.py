@@ -78,7 +78,7 @@ h1{
 		padding: 10px 35px;
 		font-family: "Poppins";
 		align-self: end;
-		transition: all .3s;
+		transition: all .2s;
 		border: none;
 
 		&:hover{ background-color: #06f2ff; }
@@ -96,25 +96,30 @@ h1{
         padding: 25px;
         border-radius: 10px;
         margin-bottom: 30px;
-        cursor: pointer;
         position: relative;
-        bottom: 0;
 
 	&.info{
+
+		&.success{
+			
+			bottom: 0;
+			transition-duration: .3s;
+                	transition-property: box-shadow, bottom;
+			box-shadow: #2e5f72 0px 0px 117px 5px;
+
+			&:hover{
+                        	box-shadow: #72bcd9 0px 20px 117px 5px;
+                        	bottom: 2px;
+                	}
+		
+		}
 
         	color: white;
         	font-family: "Poppins", sans-serif;
         	margin-bottom: 40px;
-        	transition-duration: .4s;
-        	transition-property: box-shadow, bottom;
         	animation-name: fade-in;
         	animation-duration: 0.5s;
         	animation-iteration-count: 1;
-
-        	&:hover{
-                	box-shadow: #2e5f72 0px 12px 53px -22px;
-                	bottom: 2px;
-        	}
 
         	.header {
 
