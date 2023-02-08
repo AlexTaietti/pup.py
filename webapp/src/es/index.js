@@ -22,7 +22,9 @@ const createInfoItem = (data) => {
 	header.textContent = "From "
 	header.appendChild(currentArticle)
 
-	paragraph.textContent = `“${data["paragraph"]}”`
+	const paragraphContent = data["paragraph"].split("***").join("b")
+
+	paragraph.innerHTML = `“${paragraphContent}”`
 	similarity.textContent = `This paragraph's similarity score is ~${data["similarity"]}`
 
 	updateItem.appendChild(header)

@@ -44,17 +44,17 @@ class Puppy:
                 continue
             tokenized_sentence = tokenize(sentence_text)
             similarity = tokenized_sentence.similarity(self.tokenized_target)
-            sentence_links = []
+            viable_sentence_anchors = []
             for anchor in sentence_anchors:
                 url = anchor.get("href")
                 url = self.clean_link(url)
                 if not url:
                     continue
-                sentence_links.append(url)
-            if not sentence_links:
+                viable_sentence_anchors.append(anchor)
+            if not viable_sentence_anchors:
                 continue
-            viable_links = tuple(sentence_links)
-            sentences_2_similarity[viable_links] = similarity
+            hashable_anchors_list = tuple(viable_sentence_anchors)
+            sentences_2_similarity[hashable_anchors_list] = similarity
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
@@ -79,7 +79,7 @@ class Puppy:
 
     def find_target(self, all_article_anchors):
         for anchor in all_article_anchors:
-            if anchor.parent.name in ["li", "b", "span"] or not anchor.parent.text:
+            if anchor.parent.name in ["b"] or not anchor.parent.text:
                 continue
             link = anchor.get("href")
             if not link or not link.startswith("/wiki/"):
@@ -100,11 +100,11 @@ class Puppy:
             return None
         return link
 
-    def get_best_links(self, best_sentences):
-        best_urls = max(best_sentences, key=best_sentences.get)
-        similarity = best_sentences[best_urls]
+    def get_best_anchors(self, best_sentences):
+        best_anchors = max(best_sentences, key=best_sentences.get)
+        similarity = best_sentences[best_anchors]
         self.history.append(self.current_url)
-        return best_urls, similarity
+        return best_anchors, similarity
 
     def make_update(self, best_paragraph_text_content, similarity):
         update_data = {
@@ -130,10 +130,12 @@ class Puppy:
         return update
 
     def end_run(self, target):
-        self.history.extend([self.current_url, self.target])
+        clean_target_link = self.clean_link(target.get("href"))
+        self.history.extend([self.current_url, clean_target_link])
         best_paragraph_text = target.parent.text.strip()
         tokenized_sentence = tokenize(best_paragraph_text)
         similarity = tokenized_sentence.similarity(self.tokenized_target)
+        best_paragraph_text = f"<***>{target.get_text()}</***>".join(best_paragraph_text.split(target.get_text()))
         update = self.make_success_update(best_paragraph_text, similarity)
         return self.emit_update(update)
 
@@ -157,13 +159,15 @@ class Puppy:
             if target_found:
                 return self.end_run(target_found)
             best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
-            best_links, similarity = self.get_best_links(best_sentences)
-            if best_links:
-                best_link = random.choice(best_links)
+            best_anchors, similarity = self.get_best_anchors(best_sentences)
+            if best_anchors:
+                best_anchor = random.choice(best_anchors)
+                best_link = self.clean_link(best_anchor.get("href"))
                 loop = self.loop_check(best_link)
                 if loop:
                     continue
                 best_paragraph_text_content = best_paragraph.get_text().strip()
+                best_paragraph_text_content = f"<***>{best_anchor.get_text()}</***>".join(best_paragraph_text_content.split(best_anchor.get_text()))
                 update = self.make_update(best_paragraph_text_content, similarity)
                 self.current_url = best_link
                 self.emit_update(update)
