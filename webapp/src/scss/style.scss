@@ -28,7 +28,7 @@ ul { list-style-type: none; }
 .content{
 
 	display: block;
-	padding: 60px 25px;
+	padding: 40px 25px;
 	position: relative;
 	margin: 0 auto;
 	max-width: 1100px;
@@ -45,6 +45,18 @@ ul { list-style-type: none; }
 			font-size: 5.2rem;
 			font-family: "Playfair Display";
 			margin-bottom: 25px;
+		}
+
+		.project-description{
+			margin-bottom: 15px;
+			font-size: 3.2rem;
+    			font-family: 'Playfair Display';
+		}
+
+		.description-expansion{
+			font-size: 1.6rem;
+    			font-family: 'Poppins';
+    			margin-bottom: 25px;
 		}
 
 	}
