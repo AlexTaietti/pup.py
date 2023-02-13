@@ -1,4 +1,5 @@
 const gulp = require('gulp');
+const { parallel } = require('gulp')
 const sass = require('gulp-sass')(require('sass'));
 const babel = require('gulp-babel');
 const livereload = require('gulp-livereload');
@@ -32,3 +33,5 @@ exports.default = function() {
   gulp.watch('src/scss/*.scss', css);
   gulp.watch('src/es/*.js', js);
 };
+
+exports.build = parallel(js, css, html);
