@@ -79,7 +79,7 @@ class Puppy:
 
     def find_target(self, all_article_anchors):
         for anchor in all_article_anchors:
-            if anchor.parent.name in ["b"] or not anchor.parent.text:
+            if not anchor.parent.text:
                 continue
             link = anchor.get("href")
             if not link or not link.startswith("/wiki/"):
