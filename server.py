@@ -10,12 +10,10 @@ socketio = SocketIO(app, cors_allowed_origins='*')
 def home():
     return send_from_directory("webapp/dist", "index.html")
 
-
 @socketio.on('connect')
 def test_connect():
     print(f"[*] server: connection received from socket {request.sid}")
     socketio.emit('connected',  {'data':'🐶🐶🐶'})
-
 
 @socketio.on('fetch')
 def fetch_target(data):
@@ -24,4 +22,4 @@ def fetch_target(data):
     pupper = pup.Puppy(start, target, socketio, request.sid)
     pupper.run()
 
-socketio.run(app)
+socketio.run(app, host='0.0.0.0', debug=True)
