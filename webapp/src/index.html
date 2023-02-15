@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Playfair+Display">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins">
   </head>
   <body>
@@ -27,6 +28,13 @@
 		  </form>
 		  <ul class="updates-display" id="result"></ul>
 	  </main>
+	  <div class="controls">
+	  	<button id="back-top" class="action-button back-top"><i class="fa-solid fa-up-long"></i><span class="tooltip">back to top</span></button>
+	  	<button id="clear-all" class="action-button clear-all"><i class="fa-solid fa-trash"></i><span class="tooltip">clear all updates</span></button>
+		<button id="scroll-lock" class="action-button scroll-top"><i class="fa-solid fa-lock-open"></i><span class="tooltip">toggle scroll lock</span></button>
+		<button id="flag" class="action-button flag"><i class="fa-solid fa-flag-checkered"></i><span class="tooltip">view result</span></button>
+		<button id="restart" class="action-button restart"><i class="fa-solid fa-rotate-right"></i><span class="tooltip">restart current search</span></button>
+	  </div>
   </body>
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" integrity="sha384-/KNQL8Nu5gCHLqwqfQjA689Hhoqgi2S84SNUxC3roTe4EhJ9AfLkp8QiQcU8AMzI" crossorigin="anonymous"></script>
   <script src="js/index.js"></script>

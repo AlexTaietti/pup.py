@@ -1,10 +1,63 @@
-const resultDisplay = document.getElementById("result") 
-const socket = io.connect('http://127.0.0.1:5000')
+const resultDisplay = document.getElementById("result")
+
+
+////////////////////
+// action buttons //
+////////////////////
+const backTop = document.getElementById("back-top")
+const clearAll = document.getElementById("clear-all")
+const scrollLock = document.getElementById("scroll-lock")
+const scrollLockInnerIcon = scrollLock.getElementsByTagName("i")[0]
+const resultFlag = document.getElementById("flag")
+
+// scroll locking
+const toggleLockScroll = () => {
+	if(!scrollLock.classList.contains("enabled")){
+		scrollLockInnerIcon.classList.remove("fa-lock-open")
+		scrollLockInnerIcon.classList.add("fa-lock")
+		scrollLock.classList.add("enabled")
+	} else {
+		scrollLock.classList.remove("enabled")
+		scrollLockInnerIcon.classList.remove("fa-lock")
+                scrollLockInnerIcon.classList.add("fa-lock-open")
+	}
+}
+
+// used to toggle flag button state
+let resultFound = false
+
+// update clearance
+const clearAllUpdates = () => {
+	
+	if (resultDisplay.innerHTML) {
+		resultDisplay.innerHTML = ""
+		clearAll.classList.remove("enabled")
+	}
+	
+	resultFound = false
+	
+	if (resultFlag.classList.contains("enabled")) resultFlag.classList.remove("enabled")
+
+}
+
+// scroll back to top
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+
+
+
+backTop.addEventListener("click", scrollToTop)
+clearAll.addEventListener("click", clearAllUpdates)
+scrollLock.addEventListener("click", toggleLockScroll)
+
+/////////////////////
+// websocket stuff //
+/////////////////////
+const socketServerIP = location.hostname === "localhost" ? "127.0.0.1" : location.hostname
+const socket = io.connect(`http://${socketServerIP}:5000`)
 
 const createInfoItem = (data) => {
 	
 	const updateItem = document.createDocumentFragment()
-	
 	const currentArticle = document.createElement("a")
 	
 	const paragraph = document.createElement("p")
@@ -41,13 +94,18 @@ const createLoopItem = (data) => {
 
 	const exclamation = document.createElement("span")
 	exclamation.textContent = "!"
+
 	const text = document.createElement("p")
 	text.textContent = "Oh no! Puppy got stuck in a loop here "
+	
 	const stuckPageLink = document.createElement("a")
 	stuckPageLink.href = data["current_url"]
 	stuckPageLink.textContent = data["current_url"].split("/").pop().split("_").toString().toLowerCase().split(",").join(" ")
+	
 	text.appendChild(stuckPageLink)
+	
 	const moreText = document.createTextNode(", going back to the starting page...")
+	
 	text.appendChild(moreText)
 
 	DOMFragment.appendChild(exclamation)
@@ -78,7 +136,26 @@ const showUpdate = (update) => {
                 updateItem.appendChild(fragment)
 	}
 
+	if (!resultDisplay.innerHTML){ clearAll.classList.add("enabled") }
+
         resultDisplay.appendChild(updateItem)
+
+	if (updateObject["type"] == "SUCCESS") {
+		
+		resultFound = true
+		resultFlag.onclick = () => updateItem.scrollIntoView({behavior: "smooth"})
+
+		if (scrollLock.classList.contains("enabled")){
+			updateItem.scrollIntoView({behavior: "smooth"})
+		} else {
+			if (!resultFlag.classList.contains("enabled")) resultFlag.classList.add("enabled")
+		}
+       	
+	} else {
+
+		if (scrollLock.classList.contains("enabled")) updateItem.scrollIntoView({behavior: "smooth"})
+
+	}
 
 }
 
@@ -89,7 +166,7 @@ const submitForm = () => {
 	
 	if (!start || !target) return
 
-	if (resultDisplay.innerHTML) { resultDisplay.innerHTML = "" }
+	clearAllUpdates()
 
 	const formData = { "start": start, "target": target }
 	const startMessage = `Asking puppy to find the path from ${start} to ${target}`
@@ -98,9 +175,25 @@ const submitForm = () => {
 
 }
 
-socket.on('found', (message) => console.log(message))
+window.addEventListener("scroll", () => {
 
-socket.on('busy', (message) => console.log(message))
+	if(window.scrollY && !backTop.classList.contains("enabled")){
+		backTop.classList.add("enabled")
+  	}
+
+	if (!window.scrollY && backTop.classList.contains("enabled")){
+		backTop.classList.remove("enabled")
+	}
+
+	if (resultFound){
+		if ((window.innerHeight + window.scrollY) >= document.body.scrollHeight) {
+			resultFlag.classList.remove("enabled")
+		} else if (!resultFlag.classList.contains("enabled")) {
+			resultFlag.classList.add("enabled")
+		}
+	}
+
+})
 
 socket.on('connected', (message) => console.log('socketIO connected', message))
 
