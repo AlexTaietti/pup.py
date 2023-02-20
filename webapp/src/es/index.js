@@ -1,5 +1,8 @@
 const resultDisplay = document.getElementById("result")
 
+let currentStart = undefined
+let currentTarget = undefined
+let running = false
 
 ////////////////////
 // action buttons //
@@ -9,6 +12,7 @@ const clearAll = document.getElementById("clear-all")
 const scrollLock = document.getElementById("scroll-lock")
 const scrollLockInnerIcon = scrollLock.getElementsByTagName("i")[0]
 const resultFlag = document.getElementById("flag")
+const restart = document.getElementById("restart")
 
 // scroll locking
 const toggleLockScroll = () => {
@@ -22,6 +26,27 @@ const toggleLockScroll = () => {
                 scrollLockInnerIcon.classList.add("fa-lock-open")
 	}
 }
+
+
+// start new run
+const startNewRun = (start, target) => {
+
+	clearAllUpdates()
+
+        const formData = { "start": start, "target": target }
+
+        socket.emit("fetch", { start, target })
+
+        currentStart = start
+        currentTarget = target
+
+	running = true
+
+	restart.classList.add("enabled")
+
+}
+
+restart.addEventListener("click", () => startNewRun(currentStart, currentTarget))
 
 // used to toggle flag button state
 let resultFound = false
@@ -150,6 +175,8 @@ const showUpdate = (update) => {
 		} else {
 			if (!resultFlag.classList.contains("enabled")) resultFlag.classList.add("enabled")
 		}
+
+		running = false
        	
 	} else {
 
@@ -166,12 +193,7 @@ const submitForm = () => {
 	
 	if (!start || !target) return
 
-	clearAllUpdates()
-
-	const formData = { "start": start, "target": target }
-	const startMessage = `Asking puppy to find the path from ${start} to ${target}`
-
-	socket.emit("fetch", { start, target })
+	startNewRun(start, target)
 
 }
 
@@ -195,6 +217,10 @@ window.addEventListener("scroll", () => {
 
 })
 
+window.addEventListener("beforeunload", () => socket.emit("disconnect"))
+
 socket.on('connected', (message) => console.log('socketIO connected', message))
 
 socket.on('puppy live update', showUpdate)
+
+socket.on('all puppers busy', (message) => console.log(message))

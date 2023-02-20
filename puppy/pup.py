@@ -11,22 +11,30 @@ from puppy.utils.http import politely_get
 
 class Puppy:
 
-    def __init__(self, start, target, websocket, client_sid):
-        self.current_url = self.start = start
-        self.target = target
+    def __init__(self, websocket_event_emitter):
+        self.current_url = None
+        self.start = None
+        self.target = None
         self.history = list()
-        self.tokenized_target = self.get_tokenized_target()
+        self.tokenized_target = None
         self.skip = list()
-        self.websocket = websocket
-        self.client_sid = client_sid
+        self.websocket_event_emitter = websocket_event_emitter
+        self.socket_id = None
+        self.running = False
+
+    def goodbye(self):
+        self.running = False
+        self.socket_id = None
+        self.websocket_event_emitter = None
 
     def emit_update(self, update_data):
-        self.websocket.emit("puppy live update", {"update": update_data}, to=self.client_sid)
+        if self.check_running_status():
+            self.websocket_event_emitter("puppy live update", {"update": update_data}, to=self.socket_id)
 
-    def get_tokenized_target(self):
-        response_text = politely_get(self.target)
-        target_soup = bs(response_text, 'html.parser')
-        elements = target_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+    def tokenize_article(self, article_url):
+        response_text = politely_get(article_url)
+        target_soup = bs(response_text, 'lxml')
+        elements = target_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         all_text_content = ' '.join([element.get_text() for element in elements])
         tokenized_target = tokenize(all_text_content)
         return tokenized_target
@@ -37,9 +45,9 @@ class Puppy:
         for sentence in sentences:
             if not sentence:
                 continue
-            sentence_soup = bs(sentence, "html.parser")
+            sentence_soup = bs(sentence, "lxml")
             sentence_anchors = sentence_soup.find_all("a")
-            sentence_text = sentence_soup.get_text()
+            sentence_text = sentence_soup.get_text().strip()
             if not sentence_anchors or not sentence_text:
                 continue
             tokenized_sentence = tokenize(sentence_text)
@@ -58,13 +66,13 @@ class Puppy:
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
-        content_paragraphs = current_article_soup.select(".mw-parser-output p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+        content_paragraphs = current_article_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
         best_paragraph = None
-        max_similarity = 0
+        max_similarity = -1
         best_sentences = None
         for paragraph in content_paragraphs:
             if paragraph.find("a"):
-                paragraph_html = paragraph.decode_contents().strip()
+                paragraph_html = str(paragraph).strip()
                 if not paragraph_html:
                     continue
                 sentences_2_similarity = self.generate_sentence_map(paragraph_html)
@@ -75,6 +83,10 @@ class Puppy:
                         max_similarity = sentences_2_similarity[sentence]
                         best_paragraph = paragraph
                         best_sentences = sentences_2_similarity
+        if not best_sentences:
+            for par in current_article_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd"):
+                print(str(par).strip())
+                print("---------------------")
         return best_paragraph, best_sentences
 
     def find_target(self, all_article_anchors):
@@ -150,14 +162,24 @@ class Puppy:
             return True
         return False
 
-    def run(self):
-        while True:
+    def check_running_status(self):
+        return self.running
+
+    def run(self, start, target, socket_id):
+        self.current_url = self.start = start
+        self.target = target
+        self.socket_id = socket_id
+        self.tokenized_target = self.tokenize_article(target)
+        self.running = True
+        while self.check_running_status():
             response_text = politely_get(self.current_url)
-            current_article_soup = bs(response_text, "html.parser")
+            current_article_soup = bs(response_text, "lxml")
             all_anchors = current_article_soup.find_all("a")
             target_found = self.find_target(all_anchors)
             if target_found:
-                return self.end_run(target_found)
+                self.end_run(target_found)
+                self.running = False
+                break
             best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
             best_anchors, similarity = self.get_best_anchors(best_sentences)
             if best_anchors:
