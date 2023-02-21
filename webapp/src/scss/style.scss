@@ -144,7 +144,14 @@ ul { list-style-type: none; }
 		
 		}
 
-		b{ text-decoration: underline; }
+		.target {
+		
+			text-decoration: underline;
+			font-style: bold;
+			color: inherit;
+			font-weight: bold;
+		
+		}
 
         	color: white;
         	font-family: "Poppins", sans-serif;
