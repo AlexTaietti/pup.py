@@ -4,7 +4,7 @@ import sys
 import re
 import urllib.parse
 
-from bs4 import BeautifulSoup as bs
+from bs4 import BeautifulSoup as bs, NavigableString
 from selenium import webdriver
 from puppy.utils.nlp import tokenize
 from puppy.utils.http import politely_get
@@ -28,112 +28,74 @@ class Puppy:
         self.websocket_event_emitter = None
 
     def emit_update(self, update_data):
-        if self.check_running_status():
+        if self.running:
             self.websocket_event_emitter("puppy live update", {"update": update_data}, to=self.socket_id)
 
     def tokenize_article(self, article_url):
         response_text = politely_get(article_url)
         target_soup = bs(response_text, 'lxml')
-        elements = target_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+        elements = target_soup.select(".mw-parser-output > p")
         all_text_content = ' '.join([element.get_text() for element in elements])
         tokenized_target = tokenize(all_text_content)
         return tokenized_target
 
     def generate_sentence_map(self, inner_html):
-        sentences = re.split(r"(\.( |$|<)|!|\?)(?![^<]*>)", inner_html)
+        reg = re.compile(r"\.(?= [A-Z]|<)|$|!|\?(?![^<]*>)")
+        sentences = re.split(reg, inner_html)
+        sentences = filter(None, sentences)
         sentences_2_similarity = dict()
         for sentence in sentences:
-            if not sentence:
-                continue
             sentence_soup = bs(sentence, "lxml")
             sentence_anchors = sentence_soup.find_all("a")
-            sentence_text = sentence_soup.get_text().strip()
+            sentence_text = sentence_soup.get_text()
             if not sentence_anchors or not sentence_text:
                 continue
             tokenized_sentence = tokenize(sentence_text)
             similarity = tokenized_sentence.similarity(self.tokenized_target)
-            viable_sentence_anchors = []
-            for anchor in sentence_anchors:
-                url = anchor.get("href")
-                url = self.clean_link(url)
-                if not url:
-                    continue
-                viable_sentence_anchors.append(anchor)
-            if not viable_sentence_anchors:
-                continue
-            hashable_anchors_list = tuple(viable_sentence_anchors)
+            hashable_anchors_list = tuple(sentence_anchors)
             sentences_2_similarity[hashable_anchors_list] = similarity
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
-        content_paragraphs = current_article_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd")
+        content_paragraphs = current_article_soup.select(".mw-parser-output > p")
         best_paragraph = None
         max_similarity = -1
         best_sentences = None
         for paragraph in content_paragraphs:
             if paragraph.find("a"):
                 paragraph_html = str(paragraph).strip()
-                if not paragraph_html:
-                    continue
                 sentences_2_similarity = self.generate_sentence_map(paragraph_html)
-                if not sentences_2_similarity:
-                    continue
-                for sentence in sentences_2_similarity:
-                    if sentences_2_similarity[sentence] > max_similarity:
-                        max_similarity = sentences_2_similarity[sentence]
-                        best_paragraph = paragraph
-                        best_sentences = sentences_2_similarity
-        if not best_sentences:
-            for par in current_article_soup.select(".mw-parser-output > p, .mw-parser-output h1, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output h4, .mw-parser-output dd"):
-                print(str(par).strip())
-                print("---------------------")
+                if sentences_2_similarity:
+                    for sentence in sentences_2_similarity:
+                        if sentences_2_similarity[sentence] > max_similarity:
+                            max_similarity = sentences_2_similarity[sentence]
+                            best_paragraph = paragraph
+                            best_sentences = sentences_2_similarity
         return best_paragraph, best_sentences
 
-    def find_target(self, all_article_anchors):
+    def process_anchors(self, all_article_anchors):
         for anchor in all_article_anchors:
-            if not anchor.parent.text:
-                continue
             link = anchor.get("href")
             if not link or not link.startswith("/wiki/"):
+                anchor.unwrap()
                 continue
             link = urllib.parse.unquote(link)
-            if self.target.endswith(link):
+            if "Main_Page" in link or re.search('#|\?|!|Template|Help', link):
+                anchor.unwrap()
+                continue
+            clean_article_link = f"https://en.wikipedia.org{link}"
+            anchor["href"] = clean_article_link
+            if self.target == clean_article_link:
                 return anchor
-        return False
+        return None
 
-    def clean_link(self, link):
-        if not link or not link.startswith("/wiki/"):
-            return None
-        link = urllib.parse.unquote(link)
-        if "Main_Page" in link or link in self.target or "#" in link or "?" in link or ":" in link:
-            return None
-        link = f"https://en.wikipedia.org{link}"
-        if link in self.skip:
-            return None
-        return link
-
-    def get_best_anchors(self, best_sentences):
-        best_anchors = max(best_sentences, key=best_sentences.get)
-        similarity = best_sentences[best_anchors]
-        self.history.append(self.current_url)
-        return best_anchors, similarity
-
-    def make_update(self, best_paragraph_text_content, similarity):
+    def make_update(self, best_paragraph_text_content, similarity, update_type="INFO"):
         update_data = {
-            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph_text_content),
+            "paragraph": best_paragraph_text_content,
             "similarity": "{:.2f}".format(similarity),
             "current_url": self.current_url,
         }
-        update = { "type": "INFO", "data": update_data }
-        return update
-
-    def make_success_update(self, best_paragraph_text_content, similarity):
-        update_data = {
-            "paragraph": re.sub("\[.*?\]|{.*?}", "", best_paragraph_text_content),
-            "similarity": "{:.2f}".format(similarity),
-            "current_url": self.current_url,
-        }
-        update = { "type": "SUCCESS", "data": update_data }
+        update = { "type": update_type, "data": update_data }
         return update
 
     def make_loop_failure(self):
@@ -142,13 +104,12 @@ class Puppy:
         return update
 
     def end_run(self, target):
-        clean_target_link = self.clean_link(target.get("href"))
+        clean_target_link = target.get("href")
         self.history.extend([self.current_url, clean_target_link])
-        best_paragraph_text = target.parent.text.strip()
-        tokenized_sentence = tokenize(best_paragraph_text)
+        tokenized_sentence = tokenize(target.parent.text.strip())
         similarity = tokenized_sentence.similarity(self.tokenized_target)
-        best_paragraph_text = f"<***>{target.get_text()}</***>".join(best_paragraph_text.split(target.get_text()))
-        update = self.make_success_update(best_paragraph_text, similarity)
+        best_paragraph_text_content = self.highlight_target(target.parent, target)
+        update = self.make_update(best_paragraph_text_content, similarity, update_type="SUCCESS")
         return self.emit_update(update)
 
     def loop_check(self, best_link):
@@ -162,8 +123,14 @@ class Puppy:
             return True
         return False
 
-    def check_running_status(self):
-        return self.running
+    def highlight_target(self, soup, target_anchor):
+        for tag in soup.find_all(True):
+            if tag == target_anchor:
+                tag["class"] = "target"
+                del tag["title"]
+            elif tag.unwrap:
+                tag.unwrap()
+        return f"“{soup.decode_contents().strip()}”"
 
     def run(self, start, target, socket_id):
         self.current_url = self.start = start
@@ -171,25 +138,34 @@ class Puppy:
         self.socket_id = socket_id
         self.tokenized_target = self.tokenize_article(target)
         self.running = True
-        while self.check_running_status():
+        while self.running:
             response_text = politely_get(self.current_url)
             current_article_soup = bs(response_text, "lxml")
+            all_superscript_tags = current_article_soup.find_all("sup")
+            for superscript_tag in all_superscript_tags:
+                superscript_tag.decompose()
             all_anchors = current_article_soup.find_all("a")
-            target_found = self.find_target(all_anchors)
+            target_found = self.process_anchors(all_anchors)
             if target_found:
                 self.end_run(target_found)
                 self.running = False
                 break
             best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
-            best_anchors, similarity = self.get_best_anchors(best_sentences)
+            if not best_sentences: # silently go back to the last page visited and try another link
+                self.history = []
+                self.skip.append(self.current_url)
+                self.current_url = self.history.pop()
+                continue
+            best_anchors = max(best_sentences, key=best_sentences.get)
+            similarity = best_sentences[best_anchors]
+            self.history.append(self.current_url)
             if best_anchors:
                 best_anchor = random.choice(best_anchors)
-                best_link = self.clean_link(best_anchor.get("href"))
+                best_link = best_anchor.get("href")
                 loop = self.loop_check(best_link)
                 if loop:
                     continue
-                best_paragraph_text_content = best_paragraph.get_text().strip()
-                best_paragraph_text_content = f"<***>{best_anchor.get_text()}</***>".join(best_paragraph_text_content.split(best_anchor.get_text()))
-                update = self.make_update(best_paragraph_text_content, similarity)
+                update_content = self.highlight_target(best_paragraph, best_anchor)
+                update = self.make_update(update_content, similarity)
                 self.current_url = best_link
                 self.emit_update(update)
