@@ -2,12 +2,16 @@ from flask import Flask, request, jsonify, send_from_directory
 from puppy import pup
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from puppy import puppy_manager
+from threading import Thread
 
 app = Flask(__name__, static_url_path='', static_folder="webapp/dist")
 socketio = SocketIO(app, cors_allowed_origins='*')
 
-MAX_PUPPERS = 3
-puppy_roster = dict()
+
+@app.before_first_request
+def initialise_ws():
+    puppy_manager.init_ws_events(socketio.emit)
 
 
 @app.route("/", methods=["GET"])
@@ -23,39 +27,20 @@ def test_connect():
 
 @socketio.on('fetch')
 def fetch_target(data):
-    global puppy_roster
     start = data["start"]
     target = data["target"]
-    socket_bound_pupper = puppy_roster.get(request.sid)
-    if socket_bound_pupper:
-        socket_bound_pupper.goodbye()
-        del puppy_roster[request.sid]
-        new_pupper = pup.Puppy(socketio.emit)
-        puppy_roster[request.sid] = new_pupper
-        new_pupper.run(start, target, request.sid)
-    else:
-        connected_sockets = puppy_roster.keys()
-        for socket in connected_sockets:
-            puppy = puppy_roster[socket]
-            if not puppy.running:
-                puppy_roster[request.sid] = puppy
-                puppy.run(start, target, request.sid)
-                return
-        if len(puppy_roster.keys()) < MAX_PUPPERS:
-            new_pupper = pup.Puppy(socketio.emit)
-            puppy_roster[request.sid] = new_pupper
-            new_pupper.run(start, target, request.sid)
-        else:
-            socketio.emit('all puppers busy',  {'data':'💔'}, to=request.sid)
+    puppy_manager.let_dog_out(start, target, request.sid)
 
 
 @socketio.on('disconnect')
 def disconnect_client():
     print(f"[*] server: socket {request.sid} disconnected")
-    socket_bound_pupper = puppy_roster.get(request.sid)
+    puppy_manager.get_socket_bound_puppy(request.sid)
     if socket_bound_pupper:
-        if socket_bound_pupper.running:
-            socket_bound_pupper.running = False
-        del puppy_roster[request.sid]
+        puppy_manager.stop_puppy(request.sid)
 
+
+puppy_manager.init_ws_events(socketio.emit)
+Thread(target=puppy_manager.process_tasks).start()
 socketio.run(app, host='0.0.0.0', debug=True)
+
