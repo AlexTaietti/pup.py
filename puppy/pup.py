@@ -106,11 +106,61 @@ class Puppy:
         self.socket_id = None
         return None
 
-    def end_run(self, target):
+    def end_run(self, article_soup, target):
         clean_target_link = target.get("href")
         tokenized_sentence = tokenize(target.parent.text.strip())
         similarity = tokenized_sentence.similarity(self.tokenized_target)
-        best_paragraph_text_content = self.highlight_target(target.parent, target)
+        current_node = target
+        best_paragraph_text_content = None
+        while current_node.parent:
+            parent = current_node.parent
+            if parent.name == "p":
+                best_paragraph_text_content = self.highlight_target(target.parent, target)
+                break
+            if parent.name == "table":
+                if parent.has_attr('class') and "wikitable" in parent.get("class"):
+                    best_paragraph_text_content = str(parent)
+                    break
+                if parent.has_attr('class') and "navbox-inner" in parent.get("class"):
+                    new_table_element = article_soup.new_tag("table")
+                    new_table_header = article_soup.new_tag("th")
+                    table_rows = parent.select("tbody tr", recursive=False)
+                    table_title = table_rows.pop(0)
+                    abbreviations = table_title.select("abbr")
+                    for abbr in abbreviations:
+                        abbr.decompose()
+                    new_table_header.string = table_title.get_text()
+                    new_table_element.append(new_table_header)
+                    for row in table_rows:
+                        new_table_row = article_soup.new_tag("tr")
+                        if row.find("th", recursive=False):
+                            current_row_title = row.find("th").get_text()
+                            new_row_title = article_soup.new_tag("h4")
+                            new_row_title.string = current_row_title
+                            new_table_row.append(new_row_title.decode_contents())
+                        row_data = row.find("td")
+                        if row_data.find("ul"):
+                            new_list = article_soup.new_tag("ul")
+                            new_row_data = article_soup.new_tag("td")
+                            inner_list = row_data.find("ul")
+                            list_items = inner_list.find_all("li")
+                            for item in list_items:
+                                item_anchor = item.find("a")
+                                if item_anchor and item_anchor != target:
+                                    item_anchor.unwrap()
+                                new_item = article_soup.new_tag("li")
+                                new_list.append(item)
+                            new_row_data.append(new_list)
+                            new_table_row.append(new_row_data)
+                        else:
+                            new_table_row.append(row_data)
+                        new_table_element.append(new_table_row)
+                    best_paragraph_text_content = str(new_table_element)
+                break
+            if parent.has_attr('class') and "thumbinner" in parent.get("class"):
+                best_paragraph_text_content = str(parent)
+                break
+            current_node = parent
         self.make_update(best_paragraph_text_content, similarity, update_type="SUCCESS")
         return self.unbind()
 
