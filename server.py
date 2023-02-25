@@ -35,7 +35,7 @@ def fetch_target(data):
 @socketio.on('disconnect')
 def disconnect_client():
     print(f"[*] server: socket {request.sid} disconnected")
-    puppy_manager.get_socket_bound_puppy(request.sid)
+    socket_bound_pupper = puppy_manager.get_socket_bound_puppy(request.sid)
     if socket_bound_pupper:
         puppy_manager.stop_puppy(request.sid)
 

@@ -8,7 +8,6 @@ import requests
 from bs4 import BeautifulSoup as bs, NavigableString
 from selenium import webdriver
 from puppy.utils.nlp import tokenize
-from puppy.utils.http import politely_get
 
 class Puppy:
 
