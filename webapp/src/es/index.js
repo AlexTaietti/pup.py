@@ -217,8 +217,17 @@ window.addEventListener("scroll", () => {
 
 window.addEventListener("beforeunload", () => socket.emit("disconnect"))
 
+const displayBusyMessage = (message) => {
+
+	console.log(message)
+	const busy = document.getElementById("busy")
+	busy.classList.remove("hidden")
+	setTimeout(() => busy.classList.add("hidden"), 2000)
+
+}
+
 socket.on('connected', (message) => console.log('socketIO connected', message))
 
 socket.on('puppy live update', showUpdate)
 
-socket.on('all puppers busy', (message) => console.log(message))
+socket.on('all puppers busy', displayBusyMessage)
