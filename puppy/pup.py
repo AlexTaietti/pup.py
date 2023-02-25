@@ -133,30 +133,27 @@ class Puppy:
         all_anchors = current_article_soup.find_all("a")
         target_found = self.process_anchors(all_anchors)
         if target_found:
-            return self.end_run(target_found)
+            return self.end_run(current_article_soup, target_found)
         best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
         if best_sentences:
             best_anchors = max(best_sentences, key=best_sentences.get)
             similarity = best_sentences[best_anchors]
-            self.history.append(self.current_url)
             best_anchor = random.choice(best_anchors)
             best_link = best_anchor.get("href")
             if self.history.count(best_link) > 3:
-                self.make_loop_failure()
-                self.skip.append(best_link)
-                self.history = []
-                return self.start
+                self.skip.append(best_link) # if stuck in a loop silently try another link on the current page
+                return self.current_url
             update_content = self.highlight_target(best_paragraph, best_anchor)
             self.make_update(update_content, similarity)
+            self.history.append(self.current_url)
             return best_link
-        self.skip.append(self.current_url) # silently go back to the last page visited and try another link
+        self.skip.append(self.current_url) # if the current article cannot be used for lack of viable anchor tags silently go back to the last page visited and try another link
         return self.history.pop()
 
     def go(self, article_url, manager_queue):
         self.current_url = article_url
         article_content = requests.get(article_url).text
         next_article = self.process_article(article_content)
-        self.history.append(article_url)
         if not next_article:
             return 1337
         manager_queue.insert(0, (self, "go", (next_article, manager_queue)))
