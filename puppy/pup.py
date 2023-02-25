@@ -79,6 +79,9 @@ class Puppy:
                 anchor.unwrap()
                 continue
             clean_article_link = f"https://en.wikipedia.org{link}"
+            if clean_article_link in self.skip:
+                anchor.unwrap()
+                continue
             anchor["href"] = clean_article_link
             if self.target == clean_article_link:
                 return anchor
