@@ -146,9 +146,11 @@ class Puppy:
                             list_items = inner_list.find_all("li")
                             for item in list_items:
                                 item_anchor = item.find("a")
-                                if item_anchor and item_anchor != target:
-                                    item_anchor.unwrap()
-                                new_item = article_soup.new_tag("li")
+                                if item_anchor:
+                                    if item_anchor != target:
+                                        item_anchor.unwrap()
+                                    else:
+                                        item_anchor["class"] = "target"
                                 new_list.append(item)
                             new_row_data.append(new_list)
                             new_table_row.append(new_row_data)

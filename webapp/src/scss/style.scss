@@ -162,10 +162,22 @@ ul { list-style-type: none; }
 .update-container{
 
 	font-size: 2.0rem;
-        padding: 25px;
-        border-radius: 10px;
-        margin-bottom: 30px;
-        position: relative;
+	padding: 25px;
+	border-radius: 10px;
+	margin-bottom: 30px;
+	position: relative;
+
+	table {
+		
+		width: 100%;
+
+		ul {
+			display: grid;
+			grid-template-columns: repeat(5, 1fr);
+			grid-gap: 3px 0;
+		}
+	
+	}
 
 	&:last-of-type{ margin-bottom: 0px; }
 
