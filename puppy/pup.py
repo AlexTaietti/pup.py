@@ -1,13 +1,13 @@
-import time
 import random
-import sys
 import re
 import urllib.parse
 import requests
 
-from bs4 import BeautifulSoup as bs, NavigableString
-from selenium import webdriver
+from bs4 import BeautifulSoup as bs
 from puppy.utils.nlp import tokenize
+from puppy.utils.soup import derive_new_table, derive_new_table_sidebar, derive_new_table_infobox, \
+                             derive_new_thumbnail, remove_all_tags
+
 
 class Puppy:
 
