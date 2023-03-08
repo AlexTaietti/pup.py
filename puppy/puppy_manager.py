@@ -4,7 +4,7 @@ from . import pup
 from threading import Thread
 
 
-MAX_PUPPERS = 3
+MAX_PUPPERS = 5
 POLITE_DELAY = 0.2 # stagger requests to respect our beloved wikipedia servers <3
 PUPPY_ROSTER = dict()
 
