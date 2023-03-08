@@ -61,7 +61,7 @@ def let_dog_out(start, target, socket_id):
     if puppy:
         PUPPY_ROSTER[socket_id] = puppy
         return TASK_QUEUE.insert(0, (puppy, "init_run", (start, target, socket_id, TASK_QUEUE)))
-    ws_emitter('all puppers busy',  {'data':'💔'}, to=socket_id)
+    ws_emitter('all puppers busy',  {'data': '💔'}, to=socket_id)
 
 
 def process_tasks():
