@@ -46,6 +46,7 @@ class Puppy:
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
+        # in the future should look for next article in thumbnails and tables too
         content_paragraphs = current_article_soup.select(".mw-parser-output > p")
         best_paragraph = None
         max_similarity = -1
@@ -159,8 +160,9 @@ class Puppy:
             self.make_update(update_content, similarity)
             self.history.append(self.current_url)
             return best_link
-        self.skip.append(self.current_url)  # if the current article cannot be used for lack of viable anchor tags
-                                            # silently go back to the last page visited and try another link
+        # if the current article cannot be used for lack of viable anchor tags silently go back to the last page
+        # visited and try another link
+        self.skip.append(self.current_url)
         return self.history.pop()
 
     def go(self, article_url, manager_queue):
