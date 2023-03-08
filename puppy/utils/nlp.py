@@ -4,6 +4,7 @@ import re
 NLP = spacy.load('en_core_web_lg')
 DIRT = re.compile(r"\.|\[.*?]|\(.*?\)|[1-9]*$|{.*?}")
 
+
 def tokenize(text):
     lowercase_text = text.lower()
     doc = NLP(lowercase_text)
