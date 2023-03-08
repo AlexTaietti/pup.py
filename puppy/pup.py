@@ -88,9 +88,9 @@ class Puppy:
                 return anchor
         return None
 
-    def make_update(self, best_paragraph_text_content, similarity, update_type="INFO"):
+    def make_update(self, best_element, similarity, update_type="INFO"):
         update_data = {
-            "paragraph": best_paragraph_text_content,
+            "paragraph": str(best_element),
             "similarity": "{:.2f}".format(similarity),
             "current_url": self.current_url
         }
@@ -107,68 +107,28 @@ class Puppy:
         self.socket_id = None
         return None
 
-    def end_run(self, article_soup, target):
-        clean_target_link = target.get("href")
-        tokenized_sentence = tokenize(target.parent.text.strip())
-        similarity = tokenized_sentence.similarity(self.tokenized_target)
-        current_node = target
-        best_paragraph_text_content = None
-        while current_node.parent:
-            parent = current_node.parent
-            if parent.name == "p":
-                best_paragraph_text_content = self.highlight_target(target.parent, target)
-                break
-            if parent.name == "table":
-                if parent.has_attr('class') and "wikitable" in parent.get("class"):
-                    best_paragraph_text_content = str(parent)
-                    break
-                if parent.has_attr('class') and "navbox-inner" in parent.get("class"):
-                    new_table_element = article_soup.new_tag("table")
-                    new_table_header = article_soup.new_tag("th")
-                    table_rows = parent.select("tbody tr", recursive=False)
-                    table_title = table_rows.pop(0)
-                    abbreviations = table_title.select("abbr")
-                    for abbr in abbreviations:
-                        abbr.decompose()
-                    new_table_header.string = table_title.get_text()
-                    new_table_element.append(new_table_header)
-                    for row in table_rows:
-                        new_table_row = article_soup.new_tag("tr")
-                        if row.find("th", recursive=False):
-                            current_row_title = row.find("th").get_text()
-                            new_row_title = article_soup.new_tag("h4")
-                            new_row_title.string = current_row_title
-                            new_table_row.append(new_row_title.decode_contents())
-                        row_data = row.find("td")
-                        if row_data.find("ul"):
-                            new_list = article_soup.new_tag("ul")
-                            new_row_data = article_soup.new_tag("td")
-                            inner_list = row_data.find("ul")
-                            list_items = inner_list.find_all("li")
-                            for item in list_items:
-                                item_anchor = item.find("a")
-                                if item_anchor:
-                                    if item_anchor != target:
-                                        item_anchor.unwrap()
-                                    else:
-                                        item_anchor["class"] = "target"
-                                new_list.append(item)
-                            new_row_data.append(new_list)
-                            new_table_row.append(new_row_data)
-                        else:
-                            new_table_row.append(row_data)
-                        new_table_element.append(new_table_row)
-                    best_paragraph_text_content = str(new_table_element)
-                break
+    def end_run(self, target):
+        best_paragraph = None
+        for parent in target.parents:
             if parent.has_attr('class') and "thumbinner" in parent.get("class"):
-                best_paragraph_text_content = str(parent)
+                best_paragraph = derive_new_thumbnail(target, parent)
                 break
-            current_node = parent
-        self.make_update(best_paragraph_text_content, similarity, update_type="SUCCESS")
+            if parent.has_attr('class') and "navbox-inner" in parent.get("class"):
+                best_paragraph = derive_new_table(target, parent)
+                break
+            if parent.has_attr("class") and "infobox" in parent.get("class"):
+                best_paragraph = derive_new_table_infobox(target, parent)
+                break
+            if parent.has_attr("class") and "sidebar" in parent.get("class"):
+                best_paragraph = derive_new_table_sidebar(target, parent)
+                break
+        if not best_paragraph:
+            best_paragraph = Puppy.highlight_target(target.parent, target)
+        tokenized_sentence = tokenize(best_paragraph.get_text().strip())
+        similarity = tokenized_sentence.similarity(self.tokenized_target)
+        self.make_update(best_paragraph, similarity, update_type="SUCCESS")
         return self.unbind()
 
-
-    def highlight_target(self, soup, target_anchor):
     @staticmethod
     def highlight_target(soup, target_anchor):
         for tag in soup.find_all(True):
@@ -177,18 +137,16 @@ class Puppy:
                 del tag["title"]
             elif tag.unwrap:
                 tag.unwrap()
-        return f"“{soup.decode_contents().strip()}”"
-
+        return soup
 
     def process_article(self, article_content):
         current_article_soup = bs(article_content, "lxml")
-        all_superscript_tags = current_article_soup.find_all("sup")
-        for superscript_tag in all_superscript_tags:
-            superscript_tag.decompose()
+        article_body = current_article_soup.find("body")
+        remove_all_tags(article_body, "sup", action="delete")
         all_anchors = current_article_soup.find_all("a")
         target_found = self.process_anchors(all_anchors)
         if target_found:
-            return self.end_run(current_article_soup, target_found)
+            return self.end_run(target_found)
         best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
         if best_sentences:
             best_anchors = max(best_sentences, key=best_sentences.get)
@@ -196,13 +154,14 @@ class Puppy:
             best_anchor = random.choice(best_anchors)
             best_link = best_anchor.get("href")
             if self.history.count(best_link) > 3:
-                self.skip.append(best_link) # if stuck in a loop silently try another link on the current page
+                self.skip.append(best_link)  # if stuck in a loop silently try another link on the current page
                 return self.current_url
-            update_content = self.highlight_target(best_paragraph, best_anchor)
+            update_content = Puppy.highlight_target(best_paragraph, best_anchor)
             self.make_update(update_content, similarity)
             self.history.append(self.current_url)
             return best_link
-        self.skip.append(self.current_url) # if the current article cannot be used for lack of viable anchor tags silently go back to the last page visited and try another link
+        self.skip.append(self.current_url)  # if the current article cannot be used for lack of viable anchor tags
+                                            # silently go back to the last page visited and try another link
         return self.history.pop()
 
     def go(self, article_url, manager_queue):
@@ -213,12 +172,11 @@ class Puppy:
             return 1337
         manager_queue.insert(0, (self, "go", (next_article, manager_queue)))
 
-
     def init_run(self, start, target, socket_id, manager_queue):
         self.start = start
         self.target = target
         target_content = requests.get(target).text
-        self.tokenized_target = self.tokenize_article(target_content)
+        self.tokenized_target = Puppy.tokenize_article(target_content)
         self.socket_id = socket_id
         manager_queue.insert(0, (self, "go", (self.start, manager_queue)))
 
