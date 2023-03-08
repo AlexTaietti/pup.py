@@ -1,4 +1,3 @@
-import requests
 import time
 
 from . import pup
@@ -74,4 +73,3 @@ def process_tasks():
             pupper, action, args = TASK_QUEUE.pop()
             puppy_action = getattr(pupper, action)
             Thread(target=puppy_action, args=args).start()
-
