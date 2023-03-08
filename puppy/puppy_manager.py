@@ -72,4 +72,4 @@ def process_tasks():
         if TASK_QUEUE:
             pupper, action, args = TASK_QUEUE.pop()
             puppy_action = getattr(pupper, action)
-            Thread(target=puppy_action, args=args).start()
+            Thread(target=puppy_action, args=args).start()  # todo: switch to threadpool class

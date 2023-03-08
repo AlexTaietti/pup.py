@@ -46,7 +46,7 @@ class Puppy:
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
-        # in the future should look for next article in thumbnails and tables too
+        # todo: in the future should look for next article in thumbnails and tables too
         content_paragraphs = current_article_soup.select(".mw-parser-output > p")
         best_paragraph = None
         max_similarity = -1
