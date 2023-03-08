@@ -23,25 +23,21 @@ const toggleLockScroll = () => {
 	} else {
 		scrollLock.classList.remove("enabled")
 		scrollLockInnerIcon.classList.remove("fa-lock")
-                scrollLockInnerIcon.classList.add("fa-lock-open")
+        scrollLockInnerIcon.classList.add("fa-lock-open")
 	}
 }
 
 
 // start new run
 const startNewRun = (start, target) => {
-
+	
 	clearAllUpdates()
-
-        const formData = { "start": start, "target": target }
-
-        socket.emit("fetch", { start, target })
-
-        currentStart = start
-        currentTarget = target
-
+    
+	const formData = { "start": start, "target": target }
+    socket.emit("fetch", { start, target })
+    currentStart = start
+    currentTarget = target
 	running = true
-
 	restart.classList.add("enabled")
 
 }
@@ -69,7 +65,6 @@ const clearAllUpdates = () => {
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 
-
 backTop.addEventListener("click", scrollToTop)
 clearAll.addEventListener("click", clearAllUpdates)
 scrollLock.addEventListener("click", toggleLockScroll)
@@ -85,8 +80,8 @@ const createInfoItem = (data) => {
 	const updateItem = document.createDocumentFragment()
 	const currentArticle = document.createElement("a")
 	
-	const paragraph = document.createElement("p")
-	paragraph.classList.add("best-paragraph")
+	const paragraphContainer = document.createElement("div")
+	paragraphContainer.classList.add("best-paragraph")
 	
 	const similarity = document.createElement("p")
 	similarity.classList.add("similarity")
@@ -100,11 +95,11 @@ const createInfoItem = (data) => {
 	header.textContent = "From "
 	header.appendChild(currentArticle)
 
-	paragraph.innerHTML = data["paragraph"]
+	paragraphContainer.innerHTML = data["paragraph"]
 	similarity.textContent = `This paragraph's similarity score is ~${data["similarity"]}`
 
 	updateItem.appendChild(header)
-	updateItem.appendChild(paragraph)
+	updateItem.appendChild(paragraphContainer)
 	updateItem.appendChild(similarity)
 
 	return updateItem
@@ -142,7 +137,7 @@ const showUpdate = (update) => {
 
 	const updateObject = update["update"]
 	const updateItem = document.createElement("li")
-        updateItem.classList.add("update-container")
+    updateItem.classList.add("update-container")
 
 	if (updateObject["type"] == "INFO"){
 		const fragment = createInfoItem(updateObject["data"])
@@ -151,17 +146,17 @@ const showUpdate = (update) => {
 	} else if (updateObject["type"] == "LOOP") {
 		const fragment = createLoopItem(updateObject["data"])
 		updateItem.classList.add("loop")
-                updateItem.appendChild(fragment)
+        updateItem.appendChild(fragment)
 	} else {
 		const fragment = createInfoItem(updateObject["data"])
-                updateItem.classList.add("info")
+        updateItem.classList.add("info")
 		updateItem.classList.add("success")
-                updateItem.appendChild(fragment)
+        updateItem.appendChild(fragment)
 	}
 
-	if (!resultDisplay.innerHTML){ clearAll.classList.add("enabled") }
+	if (!resultDisplay.innerHTML) clearAll.classList.add("enabled")
 
-        resultDisplay.appendChild(updateItem)
+    resultDisplay.appendChild(updateItem)
 
 	if (updateObject["type"] == "SUCCESS") {
 		
@@ -217,7 +212,7 @@ window.addEventListener("scroll", () => {
 
 window.addEventListener("beforeunload", () => socket.emit("disconnect"))
 
-const displayBusyMessage = (message) => {
+const displayAlert = (message) => {
 
 	console.log(message)
 	const busy = document.getElementById("busy")
@@ -230,4 +225,4 @@ socket.on('connected', (message) => console.log('socketIO connected', message))
 
 socket.on('puppy live update', showUpdate)
 
-socket.on('all puppers busy', displayBusyMessage)
+socket.on('all puppers busy', displayAlert)
