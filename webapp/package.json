@@ -1,21 +1,19 @@
 {
-  "name": "webapp",
+  "name": "puppy_webapp",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "puppy's webapp",
+  "main": "./dist/js/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Alex Taietti",
   "license": "ISC",
   "devDependencies": {
     "@babel/preset-env": "^7.20.2",
-    "gulp": "^4.0.2"
-  },
-  "dependencies": {
+    "gulp": "^4.0.2",
     "gulp-babel": "^8.0.0",
     "gulp-livereload": "^4.0.2",
     "gulp-sass": "^5.1.0",
-    "sass": "^1.57.1"
+    "sass": "^1.58.3"
   }
 }
