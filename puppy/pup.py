@@ -38,12 +38,11 @@ class Puppy:
             sentence_soup = bs(sentence, "lxml")
             sentence_anchors = sentence_soup.find_all("a")
             sentence_text = sentence_soup.get_text()
-            if not sentence_anchors or not sentence_text:
-                continue
-            tokenized_sentence = tokenize(sentence_text)
-            similarity = tokenized_sentence.similarity(self.tokenized_target)
-            hashable_anchors_list = tuple(sentence_anchors)
-            sentences_2_similarity[hashable_anchors_list] = similarity
+            if sentence_anchors and sentence_text:
+                tokenized_sentence = tokenize(sentence_text)
+                similarity = tokenized_sentence.similarity(self.tokenized_target)
+                hashable_anchors_list = tuple(sentence_anchors)
+                sentences_2_similarity[hashable_anchors_list] = similarity
         return sentences_2_similarity
 
     def get_best_paragraph(self, current_article_soup):
