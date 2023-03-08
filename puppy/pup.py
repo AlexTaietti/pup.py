@@ -21,7 +21,8 @@ class Puppy:
         self.socket_id = None
         self.current_url = None
 
-    def tokenize_article(self, article_text): # need to find a way of fetching the response from the manager
+    @staticmethod
+    def tokenize_article(article_text):
         target_soup = bs(article_text, 'lxml')
         elements = target_soup.select(".mw-parser-output > p")
         all_text_content = ' '.join([element.get_text() for element in elements])
@@ -168,6 +169,8 @@ class Puppy:
 
 
     def highlight_target(self, soup, target_anchor):
+    @staticmethod
+    def highlight_target(soup, target_anchor):
         for tag in soup.find_all(True):
             if tag == target_anchor:
                 tag["class"] = "target"
