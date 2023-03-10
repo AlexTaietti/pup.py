@@ -122,8 +122,15 @@ class Puppy:
             if parent.has_attr("class") and "sidebar" in parent.get("class"):
                 best_paragraph = derive_new_table_sidebar(target, parent)
                 break
+            if parent.has_attr("class") and "wikitable" in parent.get("class"):
+                best_paragraph = remove_all_tags(parent, "a", action="unwrap", save=target, save_class="target")
         if not best_paragraph:
             best_paragraph = Puppy.highlight_target(target.parent, target)
+            best_paragraph = element_has_parent_with_tagname(target, "p")
+            if not best_paragraph:
+                best_paragraph = target.parent
+            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=target, save_class="target")
+            best_paragraph = highlight_target_anchor(best_paragraph, target)
         tokenized_sentence = tokenize(best_paragraph.get_text().strip())
         similarity = tokenized_sentence.similarity(self.tokenized_target)
         self.make_update(best_paragraph, similarity, update_type="SUCCESS")
