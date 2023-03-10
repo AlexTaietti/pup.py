@@ -155,6 +155,7 @@ const showUpdate = (update) => {
 		running = false
 		startButton.classList.remove("running")
 		startButton.value = "Let's go!"
+		abort.classList.remove("enabled")
 
 	}
 

@@ -227,7 +227,7 @@ ul {
 	position: relative;
 
 	.thumbimage {
-		margin: 0 auto 20px auto;
+		margin: 20px auto;
 		display: block;
 	}
 
@@ -235,7 +235,7 @@ ul {
 		text-align: center;
 	}
 
-	.thumbnail-desc {
+	.thumbnail-desc, .thumbnail-bio {
 
 		margin-bottom: 20px;
 
@@ -378,7 +378,7 @@ ul {
 			border-bottom: 2px solid cyan;
 			margin-bottom: 10px;
 
-			& > *:not(table){ padding: 10px 0 20px; }
+			& > p, .thumbcaption{ padding: 10px 0 20px; }
 		
 		}
 
