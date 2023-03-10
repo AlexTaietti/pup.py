@@ -10,7 +10,7 @@
   </head>
   <body>
 	  <main class="content">
-		  <div id="busy" class="busy hidden"><span>!</span>All puppies are currently busy, retry in a little while...</div>
+		  <div id="busy" class="busy hidden"><span>!</span></div>
 		  <div class="project-header">
 		  	<h1>🐶 Pup.py 🐶</h1>
 			<h3 class="project-description">A fun answer to a question nobody asked</h3>
@@ -21,7 +21,7 @@
 			  	<label for="start">Start</label>
 			  	<input type="text" id="start" name="start">
 			  </div>
-			  <input class="start-button" type="button" value="Let's go!" onclick="submitForm()">
+			  <input id="start-button" class="start-button" type="button" value="Let's go!" onclick="submitForm()">
 			  <div class="input-container">
 			  	<label for="target">Target</label>
 			  	<input type="text" id="target" name="target">
@@ -35,6 +35,7 @@
 		<button id="scroll-lock" class="action-button scroll-top"><i class="fa-solid fa-lock-open"></i><span class="tooltip">toggle scroll lock</span></button>
 		<button id="flag" class="action-button flag"><i class="fa-solid fa-flag-checkered"></i><span class="tooltip">view result</span></button>
 		<button id="restart" class="action-button restart"><i class="fa-solid fa-rotate-right"></i><span class="tooltip">restart current search</span></button>
+		<button id="stop" class="action-button stop"><i class="fa-solid fa-ban"></i><span class="tooltip">abort run</span></button>
 	  </div>
   </body>
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" integrity="sha384-/KNQL8Nu5gCHLqwqfQjA689Hhoqgi2S84SNUxC3roTe4EhJ9AfLkp8QiQcU8AMzI" crossorigin="anonymous"></script>
