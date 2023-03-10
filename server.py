@@ -29,6 +29,11 @@ def fetch_target(data):
     puppy_manager.let_dog_out(start, target, request.sid)
 
 
+@socketio.on('stop')
+def stop_puppy():
+    puppy_manager.stop_puppy(request.sid)
+
+
 @socketio.on('disconnect')
 def disconnect_client():
     print(f"[*] server: socket {request.sid} disconnected")

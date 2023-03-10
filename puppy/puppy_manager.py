@@ -48,12 +48,13 @@ def stop_puppy(socket_id):
     global TASK_QUEUE
     global PUPPY_ROSTER
     puppy = PUPPY_ROSTER[socket_id]
-    for task in TASK_QUEUE:
-        if task[0] is puppy:
-            task_index = TASK_QUEUE.index(task)
-            TASK_QUEUE.pop(task_index)
-    del PUPPY_ROSTER[socket_id]
-    puppy.unbind()
+    if puppy:
+        for task in TASK_QUEUE:
+            if task[0] is puppy:
+                task_index = TASK_QUEUE.index(task)
+                TASK_QUEUE.pop(task_index)
+        del PUPPY_ROSTER[socket_id]
+        puppy.unbind()
 
 
 def let_dog_out(start, target, socket_id):
