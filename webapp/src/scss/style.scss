@@ -10,6 +10,22 @@
 	}
 }
 
+@keyframes glow {
+
+	0% {
+		box-shadow: 0px 0px 15px 1px #df5ffb;
+	}
+
+	50% {
+		box-shadow: 0px 0px 30px 1px #df5ffb;
+	}
+
+	100% {
+		box-shadow: 0px 0px 15px 1px #df5ffb;
+	}
+
+}
+
 *,
 *::before,
 *::after {
@@ -124,6 +140,22 @@ ul {
 		align-self: end;
 		transition: all .2s;
 		border: none;
+		box-shadow: 0px 0px 0px 0px transparent;
+
+		&.running {
+
+			background-color: #db1a97;
+			color: white;
+			animation-name: glow;
+			animation-timing-function: ease-in-out;
+			animation-iteration-count: infinite;
+			animation-duration: 2s;
+
+			&:hover {
+				background-color: #ff00a6;
+			}
+
+		}
 
 		&:hover {
 			background-color: #06f2ff;
@@ -245,6 +277,8 @@ ul {
 		border-spacing: 0 10px;
 		border-collapse: collapse;
 
+		th + th{ padding: 20px 15px 20px 0; }
+
 
 		tbody>tr {
 			border-width: 1px 0 1px 0;
@@ -253,6 +287,7 @@ ul {
 		}
 
 		th {
+			white-space: nowrap;
 			padding-right: 15px;
 			font-family: 'Playfair Display';
 			font-size: 2rem;
@@ -282,7 +317,7 @@ ul {
 			}
 
 			&>td {
-				padding: 15px 0;
+				padding: 20px 0;
 			}
 
 		}
@@ -294,6 +329,14 @@ ul {
 	}
 
 	&.info {
+
+		color: white;
+		font-family: "Poppins",
+		sans-serif;
+		margin-bottom: 40px;
+		animation-name: fade-in;
+		animation-duration: 0.5s;
+		animation-iteration-count: 1;
 
 		&.success {
 
@@ -310,27 +353,15 @@ ul {
 		}
 
 		.target {
-
 			text-decoration: underline;
-			font-style: bold;
 			color: inherit;
 			font-weight: bold;
-
 		}
-
-		color: white;
-		font-family: "Poppins",
-		sans-serif;
-		margin-bottom: 40px;
-		animation-name: fade-in;
-		animation-duration: 0.5s;
-		animation-iteration-count: 1;
 
 		.header {
 
 			font-family: "Playfrair Display", serif;
 			font-size: 2.6rem;
-			margin-bottom: 10px;
 
 			a {
 				text-decoration: none;
@@ -341,11 +372,14 @@ ul {
 		}
 
 		.best-paragraph {
+
 			font-family: "Poppins", sans-serif;
 			font-size: 1.8rem;
-			padding: 0 0 20px;
 			border-bottom: 2px solid cyan;
 			margin-bottom: 10px;
+
+			& > *:not(table){ padding: 10px 0 20px; }
+		
 		}
 
 		.similarity {
