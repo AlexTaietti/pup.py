@@ -62,7 +62,7 @@ def derive_new_table(target_anchor, table):
     table_rows = table.select("tbody tr", recursive=False)
     table_title = table_rows.pop(0)
     remove_all_tags(table_title, "abbr", "delete")
-    new_table_header = create_element(soup, "h2", tag_text_content=table_title.text)
+    new_table_header = create_element(soup, "h2", tag_text_content=table_title.get_text())
     new_table_element = create_element(soup, "table")
     for row in table_rows:
         new_table_row = create_element(soup, "tr")
@@ -111,7 +111,13 @@ def derive_new_table_sidebar(target_anchor, table):  # todo: REFACTOR!
     return create_element(soup, "div", tag_inner=[new_table_header, new_table_element])
 
 
-def derive_new_table_infobox(target_anchor, table):  # todo: REFACTOR!
+def derive_new_table_infobox(target_anchor, table):
+    if "biota" in table.get("class"):
+        return derive_new_biota_infobox(target_anchor, table)
+    return derive_new_table_infobox_vcard(target_anchor, table)
+
+
+def derive_new_table_infobox_vcard(target_anchor, table):  # todo: REFACTOR!
     soup = get_soup_from(target_anchor)
     table_rows = table.select("tbody tr", recursive=False)
     new_table_element = create_element(soup, "table")
@@ -151,6 +157,20 @@ def derive_new_table_infobox(target_anchor, table):  # todo: REFACTOR!
             new_table_row.append(new_row_data)
             new_table_element.append(new_table_row)
     return create_element(soup, "div", tag_inner=[new_thumbnail, new_table_element])
+
+
+def derive_new_biota_infobox(target_anchor, table):
+    soup = get_soup_from(target_anchor)
+    table_rows = table.select("tbody tr", recursive=False)
+    new_table_element = create_element(soup, "table")
+    for row in table_rows:
+        row_data = row.select("td")
+        if row_data and len(row_data) >= 2:
+            remove_all_tags(row, "a", action="unwrap", save=target_anchor, save_action=prepare_target_anchor)
+            new_row_header = create_element(soup, "th", tag_text_content=row_data[0].get_text().replace(":", "").strip())
+            new_row = create_element(soup, "tr", tag_inner=[new_row_header, row_data[1]])
+            new_table_element.append(new_row)
+    return create_element(soup, "div", tag_inner=new_table_element)
 
 
 def derive_new_thumbnail(target_anchor, thumbnail_container):
