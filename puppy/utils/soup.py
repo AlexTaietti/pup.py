@@ -3,7 +3,7 @@ def create_element(soup, tag_name, tag_text_content=None, tag_inner=None, classn
     if tag_text_content:
         new_element.string = tag_text_content
     if tag_inner:
-        if len(tag_inner):  # this check is probably a bit weak, a more solid one might be needed in the future
+        if isinstance(tag_inner, list):
             for element in tag_inner:
                 new_element.append(element)
         else:
@@ -21,6 +21,20 @@ def get_soup_from(tag):  # once the parents iterator runs out the last element w
     return soup
 
 
+def prepare_target_anchor(target_anchor):
+    target_anchor["class"] = "target"
+    target_anchor["target"] = "_blank"
+    del target_anchor["title"]
+    return target_anchor
+
+
+def highlight_target_anchor(soup, target_anchor):
+    for tag in soup.find_all(True):
+        if tag == target_anchor:
+            prepare_target_anchor(tag)
+    return soup
+
+
 def remove_all_tags(soup, tag_name, action, save=None, save_class=None, save_id=None):
     tags = soup.find_all(tag_name)
     if not tags:
@@ -28,9 +42,9 @@ def remove_all_tags(soup, tag_name, action, save=None, save_class=None, save_id=
     for tag in tags:
         if tag == save:
             if save_class:
-                save["class"] = save_class
+                tag["class"] = save_class
             if save_id:
-                save["id"] = save_id
+                tag["id"] = save_id
             continue
         if action == "delete":
             tag.decompose()
@@ -39,21 +53,15 @@ def remove_all_tags(soup, tag_name, action, save=None, save_class=None, save_id=
     return soup
 
 
-def element_has_parent_with_class(element, class_name):
+def element_has_parent_with_tagname(element, tag_name):
     for parent in element.parents:
-        if parent.has_attr("class") and class_name in parent.get("class"):
+        if parent.name == tag_name:
             return parent
     return False
 
 
-def append_multi(parent, elements):
-    for element in elements:
-        parent.append(element)
-    return parent
-
-
 def derive_new_table(target_anchor, table):
-    soup = get_soup_from(target_anchor)  # a bit ugly: REFACTOR SOON!
+    soup = get_soup_from(target_anchor)  # todo: REFACTOR!
     table_rows = table.select("tbody tr", recursive=False)
     table_title = table_rows.pop(0)
     remove_all_tags(table_title, "abbr", "delete")
@@ -73,10 +81,10 @@ def derive_new_table(target_anchor, table):
         new_row_data.append(new_list)
         new_table_row.append(new_row_data)
         new_table_element.append(new_table_row)
-    return create_element(soup, "p", tag_inner=[new_table_header, new_table_element])
+    return create_element(soup, "div", tag_inner=[new_table_header, new_table_element])
 
 
-def derive_new_table_sidebar(target_anchor, table):  # a bit ugly: REFACTOR SOON!
+def derive_new_table_sidebar(target_anchor, table):  # todo: REFACTOR!
     soup = get_soup_from(target_anchor)
     new_table_element = create_element(soup, "table")
     table_rows = table.select("tbody tr", recursive=False)
@@ -103,10 +111,10 @@ def derive_new_table_sidebar(target_anchor, table):  # a bit ugly: REFACTOR SOON
             new_row_data.append(new_list)
             new_table_row.append(new_row_data)
             new_table_element.append(new_table_row)
-    return create_element(soup, "p", tag_inner=[new_table_header, new_table_element])
+    return create_element(soup, "div", tag_inner=[new_table_header, new_table_element])
 
 
-def derive_new_table_infobox(target_anchor, table):  # a bit ugly: REFACTOR SOON!
+def derive_new_table_infobox(target_anchor, table):  # todo: REFACTOR!
     soup = get_soup_from(target_anchor)
     table_rows = table.select("tbody tr", recursive=False)
     new_table_element = create_element(soup, "table")
@@ -133,7 +141,19 @@ def derive_new_table_infobox(target_anchor, table):  # a bit ugly: REFACTOR SOON
                 new_row_data.append(new_list)
                 new_table_row.append(new_row_data)
                 new_table_element.append(new_table_row)
-    return create_element(soup, "p", tag_inner=[new_thumbnail, new_table_element])
+                continue
+            row_data_fragments = list()
+            for element in row_data:
+                if element == target_anchor:
+                    target_anchor = prepare_target_anchor(element)
+                    row_data_fragments.append(target_anchor)
+                    continue
+                text_fragment = f" {element.get_text().strip()} "
+                row_data_fragments.append(text_fragment)
+            new_row_data = create_element(soup, "td", tag_inner=row_data_fragments)
+            new_table_row.append(new_row_data)
+            new_table_element.append(new_table_row)
+    return create_element(soup, "div", tag_inner=[new_thumbnail, new_table_element])
 
 
 def derive_new_thumbnail(target_anchor, thumbnail_container):
@@ -142,4 +162,4 @@ def derive_new_thumbnail(target_anchor, thumbnail_container):
     caption = thumbnail_container.find("div", {"class": "thumbcaption"})
     caption.find("div", {"class": "magnify"}).decompose()
     caption = remove_all_tags(caption, "a", action="unwrap", save=target_anchor, save_class="target")
-    return create_element(soup, "p", tag_inner=[image_tag, caption])
+    return create_element(soup, "div", tag_inner=[image_tag, caption])

@@ -4,9 +4,10 @@ import urllib.parse
 import requests
 
 from bs4 import BeautifulSoup as bs
-from puppy.utils.nlp import tokenize
+from puppy.utils.nlp import tokenize, tokenize_article
 from puppy.utils.soup import derive_new_table, derive_new_table_sidebar, derive_new_table_infobox, \
-                             derive_new_thumbnail, remove_all_tags
+                             derive_new_thumbnail, remove_all_tags, highlight_target_anchor,\
+                             element_has_parent_with_tagname
 
 
 class Puppy:
@@ -20,14 +21,6 @@ class Puppy:
         self.websocket_event_emitter = websocket_event_emitter
         self.socket_id = None
         self.current_url = None
-
-    @staticmethod
-    def tokenize_article(article_text):
-        target_soup = bs(article_text, 'lxml')
-        elements = target_soup.select(".mw-parser-output > p")
-        all_text_content = ' '.join([element.get_text() for element in elements])
-        tokenized_target = tokenize(all_text_content)
-        return tokenized_target
 
     def generate_sentence_map(self, inner_html):
         reg = re.compile(r"\.(?= [A-Z]|<)|$|!|\?(?![^<]*>)")
@@ -125,7 +118,6 @@ class Puppy:
             if parent.has_attr("class") and "wikitable" in parent.get("class"):
                 best_paragraph = remove_all_tags(parent, "a", action="unwrap", save=target, save_class="target")
         if not best_paragraph:
-            best_paragraph = Puppy.highlight_target(target.parent, target)
             best_paragraph = element_has_parent_with_tagname(target, "p")
             if not best_paragraph:
                 best_paragraph = target.parent
@@ -135,16 +127,6 @@ class Puppy:
         similarity = tokenized_sentence.similarity(self.tokenized_target)
         self.make_update(best_paragraph, similarity, update_type="SUCCESS")
         return self.unbind()
-
-    @staticmethod
-    def highlight_target(soup, target_anchor):
-        for tag in soup.find_all(True):
-            if tag == target_anchor:
-                tag["class"] = "target"
-                del tag["title"]
-            elif tag.unwrap:
-                tag.unwrap()
-        return soup
 
     def process_article(self, article_content):
         current_article_soup = bs(article_content, "lxml")
@@ -163,8 +145,9 @@ class Puppy:
             if self.history.count(best_link) > 3:
                 self.skip.append(best_link)  # if stuck in a loop silently try another link on the current page
                 return self.current_url
-            update_content = Puppy.highlight_target(best_paragraph, best_anchor)
-            self.make_update(update_content, similarity)
+            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=best_anchor,
+                                             save_class="target")
+            self.make_update(best_paragraph, similarity)
             self.history.append(self.current_url)
             return best_link
         # if the current article cannot be used for lack of viable anchor tags silently go back to the last page
@@ -184,7 +167,8 @@ class Puppy:
         self.start = start
         self.target = target
         target_content = requests.get(target).text
-        self.tokenized_target = Puppy.tokenize_article(target_content)
+        target_content_soup = bs(target_content, "lxml")
+        self.tokenized_target = tokenize_article(target_content_soup)
         self.socket_id = socket_id
         manager_queue.insert(0, (self, "go", (self.start, manager_queue)))
 
