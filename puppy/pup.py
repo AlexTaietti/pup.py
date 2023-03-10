@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup as bs
 from puppy.utils.nlp import tokenize, tokenize_article
 from puppy.utils.soup import derive_new_table, derive_new_table_sidebar, derive_new_table_infobox, \
                              derive_new_thumbnail, remove_all_tags, highlight_target_anchor,\
-                             element_has_parent_with_tagname
+                             element_has_parent_with_tagname, prepare_target_anchor
 
 
 class Puppy:
@@ -116,12 +116,12 @@ class Puppy:
                 best_paragraph = derive_new_table_sidebar(target, parent)
                 break
             if parent.has_attr("class") and "wikitable" in parent.get("class"):
-                best_paragraph = remove_all_tags(parent, "a", action="unwrap", save=target, save_class="target")
+                best_paragraph = remove_all_tags(parent, "a", action="unwrap", save=target, save_action=prepare_target_anchor)
         if not best_paragraph:
             best_paragraph = element_has_parent_with_tagname(target, "p")
             if not best_paragraph:
                 best_paragraph = target.parent
-            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=target, save_class="target")
+            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=target, save_action=prepare_target_anchor)
             best_paragraph = highlight_target_anchor(best_paragraph, target)
         tokenized_sentence = tokenize(best_paragraph.get_text().strip())
         similarity = tokenized_sentence.similarity(self.tokenized_target)
@@ -145,8 +145,7 @@ class Puppy:
             if self.history.count(best_link) > 3:
                 self.skip.append(best_link)  # if stuck in a loop silently try another link on the current page
                 return self.current_url
-            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=best_anchor,
-                                             save_class="target")
+            best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=best_anchor, save_action=prepare_target_anchor)
             self.make_update(best_paragraph, similarity)
             self.history.append(self.current_url)
             return best_link

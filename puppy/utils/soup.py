@@ -35,16 +35,13 @@ def highlight_target_anchor(soup, target_anchor):
     return soup
 
 
-def remove_all_tags(soup, tag_name, action, save=None, save_class=None, save_id=None):
+def remove_all_tags(soup, tag_name, action, save=None, save_action=None):
     tags = soup.find_all(tag_name)
     if not tags:
         return soup
     for tag in tags:
         if tag == save:
-            if save_class:
-                tag["class"] = save_class
-            if save_id:
-                tag["id"] = save_id
+            save_action(tag)
             continue
         if action == "delete":
             tag.decompose()
@@ -75,7 +72,7 @@ def derive_new_table(target_anchor, table):
             new_table_row.append(new_row_title)
         row_data_list = row.find("ul")
         new_row_data = create_element(soup, "td")
-        row_data_list = remove_all_tags(row_data_list, "a", "unwrap", save=target_anchor, save_class="target")
+        row_data_list = remove_all_tags(row_data_list, "a", "unwrap", save=target_anchor, save_action=prepare_target_anchor)
         items = row_data_list.select("li")
         new_list = create_element(soup, "ul", tag_inner=items)
         new_row_data.append(new_list)
@@ -105,7 +102,7 @@ def derive_new_table_sidebar(target_anchor, table):  # todo: REFACTOR!
             new_table_row.append(new_row_title)
             inner_list = row.find("div", {"class": "sidebar-list-content"}).find("ul")
             new_row_data = create_element(soup, "td")
-            inner_list = remove_all_tags(inner_list, "a", action="unwrap", save=target_anchor, save_class="target")
+            inner_list = remove_all_tags(inner_list, "a", action="unwrap", save=target_anchor, save_action=prepare_target_anchor)
             items = inner_list.find_all("li")
             new_list = create_element(soup, "ul", tag_inner=items)
             new_row_data.append(new_list)
@@ -132,10 +129,10 @@ def derive_new_table_infobox(target_anchor, table):  # todo: REFACTOR!
             new_row_title = create_element(soup, "th", tag_text_content=row_title_text)
             new_table_row.append(new_row_title)
             row_data = row.find("td", {"class": "infobox-data"})
-            if row_data.find("ul"):
+            inner_list = row_data.find("ul")
+            if inner_list:
                 new_row_data = create_element(soup, "td")
-                inner_list = row_data.find("ul")
-                inner_list = remove_all_tags(inner_list, "a", action="unwrap", save_class="target", save=target_anchor)
+                inner_list = remove_all_tags(inner_list, "a", action="unwrap", save=target_anchor, save_action=prepare_target_anchor)
                 items = inner_list.find_all("li")
                 new_list = create_element(soup, "ul", tag_inner=items)
                 new_row_data.append(new_list)
@@ -161,5 +158,5 @@ def derive_new_thumbnail(target_anchor, thumbnail_container):
     image_tag = thumbnail_container.img.extract()
     caption = thumbnail_container.find("div", {"class": "thumbcaption"})
     caption.find("div", {"class": "magnify"}).decompose()
-    caption = remove_all_tags(caption, "a", action="unwrap", save=target_anchor, save_class="target")
+    caption = remove_all_tags(caption, "a", action="unwrap", save=target_anchor, save_action=prepare_target_anchor)
     return create_element(soup, "div", tag_inner=[image_tag, caption])
