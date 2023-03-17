@@ -1,77 +1,73 @@
 import time
 
-from . import pup
-from threading import Thread
+from puppy.pup import Puppy
+from multiprocessing.pool import ThreadPool
 
 
-MAX_PUPPERS = 5
-POLITE_DELAY = 0.2 # stagger requests to respect our beloved wikipedia servers <3
-PUPPY_ROSTER = dict()
+class PuppyManager:
 
-ws_emitter = None
-TASK_QUEUE = list() # will hold the tasks to be executed by the puppers
+    max_puppies = 5
+    polite_delay = 0.1  # in seconds
 
+    def __init__(self, websockets_emitter):
+        self.puppy_queue = list()
+        self.puppy_roster = dict()
+        self.available_puppies = list()
+        self.websocket_events_emitter = websockets_emitter
 
-def init_ws_events(ws_emit):
-    global ws_emitter
-    print("[*] server: initialising ws emitter")
-    ws_emitter = ws_emit
-
-
-def get_puppy(socket_id):
-    global PUPPY_ROSTER
-    global MAX_PUPPERS
-    global ws_emitter
-    if not PUPPY_ROSTER:
-        pupper = pup.Puppy(ws_emitter)
+    def get_available_puppy(self, socket_id):
+        if self.puppy_roster:
+            puppy = self.get_socket_bound_puppy(socket_id)
+            if puppy:
+                self.stop_puppy(socket_id)
+                return puppy
+            if self.available_puppies:
+                pupper = self.available_puppies.pop()
+                return pupper
+            if len(self.puppy_roster) < self.max_puppies:
+                pupper = Puppy(socket_id)
+                return pupper
+            return None
+        pupper = Puppy(socket_id)
         return pupper
-    puppy = get_socket_bound_puppy(socket_id)
-    if puppy:
-        stop_puppy(socket_id)
-        return puppy
-    for socket in PUPPY_ROSTER:
-        puppy = PUPPY_ROSTER[socket]
-        if not puppy.socket_id:
-            del PUPPY_ROSTER[socket]
-            return puppy
-    if len(PUPPY_ROSTER) < MAX_PUPPERS:
-        pupper = pup.Puppy(ws_emitter)
-        return pupper
-    return None
 
+    def stop_puppy(self, socket_id):
+        puppy = self.puppy_roster[socket_id]
+        if puppy:
+            puppy.reset()
+            del self.puppy_roster[socket_id]
+            for pupper in self.puppy_queue:
+                if pupper is puppy:
+                    self.puppy_queue.remove(pupper)
+            self.available_puppies.insert(0, puppy)
 
-def get_socket_bound_puppy(socket_id):
-    return PUPPY_ROSTER.get(socket_id)
+    def get_socket_bound_puppy(self, socket_id):
+        return self.puppy_roster.get(socket_id)
 
+    def let_dog_out(self, start, target, socket_id):
+        puppy = self.get_available_puppy(socket_id)
+        if puppy:
+            puppy.init_run_parameters(start, target, socket_id)
+            self.puppy_roster[socket_id] = puppy
+            print(f"[*] new puppy added to roster for socket {socket_id}")
+            return self.puppy_queue.insert(0, puppy)
+        self.websocket_events_emitter('all puppers busy', 'All puppies are currently busy, retry later', to=socket_id)
 
-def stop_puppy(socket_id):
-    global TASK_QUEUE
-    global PUPPY_ROSTER
-    puppy = PUPPY_ROSTER[socket_id]
-    if puppy:
-        for task in TASK_QUEUE:
-            if task[0] is puppy:
-                task_index = TASK_QUEUE.index(task)
-                TASK_QUEUE.pop(task_index)
-        del PUPPY_ROSTER[socket_id]
-        puppy.unbind()
+    def handle_threaded_puppy(self, threaded_puppy):
+        if threaded_puppy.update_data:
+            self.websocket_events_emitter("puppy live update", {"update": threaded_puppy.update_data}, to=threaded_puppy.socket_id)
+        if threaded_puppy.next_article:
+            self.puppy_queue.append(threaded_puppy)
+            return
+        self.stop_puppy(threaded_puppy.socket_id)
 
+    def process_tasks(self):
+        with ThreadPool(self.max_puppies) as pool_of_threads:
+            while True:
+                time.sleep(self.polite_delay)
+                if self.puppy_queue:
+                    pupper = self.puppy_queue.pop()
+                    if not pupper.next_article:
+                        pool_of_threads.apply_async(pupper.tokenize_target, callback=self.handle_threaded_puppy)
+                    pool_of_threads.apply_async(pupper.go, callback=self.handle_threaded_puppy)
 
-def let_dog_out(start, target, socket_id):
-    puppy = get_puppy(socket_id)
-    if puppy:
-        puppy.bind_to(socket_id)
-        PUPPY_ROSTER[socket_id] = puppy
-        return TASK_QUEUE.insert(0, (puppy, "init_run", (start, target, TASK_QUEUE)))
-    ws_emitter('all puppers busy',  'All puppies are currently busy, retry later', to=socket_id)
-
-
-def process_tasks():
-    global PUPPY_ROSTER
-    global TASK_QUEUE
-    while True:
-        time.sleep(POLITE_DELAY)
-        if TASK_QUEUE:
-            pupper, action, args = TASK_QUEUE.pop()
-            puppy_action = getattr(pupper, action)
-            Thread(target=puppy_action, args=args).start()  # todo: switch to threadpool class

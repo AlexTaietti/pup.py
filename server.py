@@ -1,14 +1,11 @@
 from flask import Flask, request, send_from_directory
 from flask_socketio import SocketIO
-from puppy import puppy_manager
+from puppy.puppy_manager import PuppyManager
 from threading import Thread
 
 app = Flask(__name__, static_url_path='', static_folder="webapp/dist")
 socketio = SocketIO(app, cors_allowed_origins='*')
-
-
-with app.app_context():
-    puppy_manager.init_ws_events(socketio.emit)
+puppy_manager = PuppyManager(socketio.emit)
 
 
 @app.route("/", methods=["GET"])
