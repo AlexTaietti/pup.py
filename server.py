@@ -42,6 +42,13 @@ def disconnect_client():
         puppy_manager.stop_puppy(request.sid)
 
 
-Thread(target=puppy_manager.process_tasks).start()
-socketio.run(app, host='0.0.0.0', debug=True, allow_unsafe_werkzeug=True)
+def start_server():
+    socketio.run(app, host='0.0.0.0', allow_unsafe_werkzeug=True)
 
+
+if __name__ == "__main__":
+    puppy_queue_processing_thread = Thread(target=puppy_manager.process_tasks)
+    socket_server_thread = Thread(target=start_server)
+    print("let's roll!")
+    puppy_queue_processing_thread.start()
+    socket_server_thread.start()
