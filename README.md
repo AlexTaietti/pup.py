@@ -5,8 +5,6 @@
 
 This good boy can find a chain of articles connecting any two pages across the english section of wikipedia using nothing more than minor text processing and [cosine similarity](https://spacy.io/usage/linguistic-features#vectors-similarity) scoring based on word embeddings provided by spacy's large english pipeline package. At times it might get hilariously lost in some obscure part of the website but at other times it might find cool and unexpected connections between seemingly unrelated topics. All you have to do is supply the url of the article you want the search to begin from and a target that Puppy should hunt down across wikipedia, then sit back and watch the live updates roll in.
 
-**Note**: Because of GIL and my poor understanding of multiprocessing this project cannot be scaled much currently. Once started puppy can be accessed from a maximum of 5 clients on your local network (multiple tabs opened in the same browser will count as separate clients because of how web sockets work).
-
 **Note**: This is a work in progress and is still missing many features, so you might run into bugs. Feel free to open an issue to report any problems with the app or even fix them yourself through a pull request.
 
 ------------------
