@@ -44,8 +44,8 @@ def start_server():
 
 
 if __name__ == "__main__":
-    puppy_queue_processing_thread = Thread(target=puppy_manager.process_tasks)
-    socket_server_thread = Thread(target=start_server)
-    print("let's roll!")
+    puppy_queue_processing_thread = Thread(name="puppy_queue", target=puppy_manager.process_tasks)
+    socket_server_thread = Thread(name="socket_server", target=start_server)
+    print("[*] let the dogs out!")
     puppy_queue_processing_thread.start()
     socket_server_thread.start()
