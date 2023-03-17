@@ -125,7 +125,10 @@ def derive_new_table_infobox_vcard(target_anchor, table):  # todo: REFACTOR!
     for row in table_rows:
         if row.find("td", {"class": "infobox-image"}):
             thumbnail = row.find("img")
-            description = row.find("div", {"class": "infobox-caption"}).get_text()
+            description = row.find("div", {"class": "infobox-caption"})
+            if not description:
+                new_thumbnail = create_element(soup, "div", tag_inner=thumbnail, classname="thumbnail-desc")
+                continue
             description = create_element(soup, "p", tag_text_content=description)
             new_thumbnail = create_element(soup, "div", tag_inner=[thumbnail, description], classname="thumbnail-desc")
             continue
