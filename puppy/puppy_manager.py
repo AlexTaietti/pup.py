@@ -32,9 +32,9 @@ def get_puppy(socket_id):
     for socket in PUPPY_ROSTER:
         puppy = PUPPY_ROSTER[socket]
         if not puppy.socket_id:
-            del PUPPY_ROSTER[socket_id]
+            del PUPPY_ROSTER[socket]
             return puppy
-    if len(PUPPY_ROSTER.keys()) < MAX_PUPPERS:
+    if len(PUPPY_ROSTER) < MAX_PUPPERS:
         pupper = pup.Puppy(ws_emitter)
         return pupper
     return None
