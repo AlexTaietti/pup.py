@@ -60,8 +60,9 @@ def stop_puppy(socket_id):
 def let_dog_out(start, target, socket_id):
     puppy = get_puppy(socket_id)
     if puppy:
+        puppy.bind_to(socket_id)
         PUPPY_ROSTER[socket_id] = puppy
-        return TASK_QUEUE.insert(0, (puppy, "init_run", (start, target, socket_id, TASK_QUEUE)))
+        return TASK_QUEUE.insert(0, (puppy, "init_run", (start, target, TASK_QUEUE)))
     ws_emitter('all puppers busy',  'All puppies are currently busy, retry later', to=socket_id)
 
 

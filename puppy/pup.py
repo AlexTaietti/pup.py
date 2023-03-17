@@ -95,6 +95,10 @@ class Puppy:
         update = { "type": "LOOP", "data": update_data }
         self.websocket_event_emitter("puppy live update", {"update": update}, to=self.socket_id)
 
+    def bind_to(self, socket_id):
+        self.socket_id = socket_id
+        return self
+
     def unbind(self):
         self.reset()
         self.socket_id = None
@@ -162,12 +166,11 @@ class Puppy:
             return 1337
         manager_queue.insert(0, (self, "go", (next_article, manager_queue)))
 
-    def init_run(self, start, target, socket_id, manager_queue):
+    def init_run(self, start, target, manager_queue):
         self.start = start
         self.target = target
         target_content = requests.get(target).text
         target_content_soup = bs(target_content, "lxml")
         self.tokenized_target = tokenize_article(target_content_soup)
-        self.socket_id = socket_id
         manager_queue.insert(0, (self, "go", (self.start, manager_queue)))
 
