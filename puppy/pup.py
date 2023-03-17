@@ -12,15 +12,16 @@ from puppy.utils.soup import derive_new_table, derive_new_table_sidebar, derive_
 
 class Puppy:
 
-    def __init__(self, websocket_event_emitter):
+    def __init__(self, socket_id):
         self.history = list()
-        self.tokenized_target = None
         self.skip = list()
+        self.socket_id = socket_id
+        self.update_data = None
         self.start = None
         self.target = None
-        self.websocket_event_emitter = websocket_event_emitter
-        self.socket_id = None
         self.current_url = None
+        self.next_article = None
+        self.tokenized_target = None
 
     def generate_sentence_map(self, inner_html):
         reg = re.compile(r"\.(?= [A-Z]|<)|$|!|\?(?![^<]*>)")
@@ -60,7 +61,8 @@ class Puppy:
         self.start = None
         self.target = None
         self.tokenized_target = None
-        return None
+        self.next_article = None
+        return self
 
     def process_anchors(self, all_article_anchors):
         for anchor in all_article_anchors:
@@ -87,22 +89,8 @@ class Puppy:
             "similarity": "{:.2f}".format(similarity),
             "current_url": self.current_url
         }
-        update = { "type": update_type, "data": update_data }
-        self.websocket_event_emitter("puppy live update", {"update": update}, to=self.socket_id)
-
-    def make_loop_failure(self):
-        update_data = {"current_url": self.current_url}
-        update = { "type": "LOOP", "data": update_data }
-        self.websocket_event_emitter("puppy live update", {"update": update}, to=self.socket_id)
-
-    def bind_to(self, socket_id):
-        self.socket_id = socket_id
-        return self
-
-    def unbind(self):
-        self.reset()
-        self.socket_id = None
-        return None
+        update = {"type": update_type, "data": update_data}
+        return update
 
     def end_run(self, target):
         best_paragraph = None
@@ -129,8 +117,8 @@ class Puppy:
             best_paragraph = highlight_target_anchor(best_paragraph, target)
         tokenized_sentence = tokenize(best_paragraph.get_text().strip())
         similarity = tokenized_sentence.similarity(self.tokenized_target)
-        self.make_update(best_paragraph, similarity, update_type="SUCCESS")
-        return self.unbind()
+        self.update_data = self.make_update(best_paragraph, similarity, update_type="SUCCESS")
+        return self
 
     def process_article(self, article_content):
         current_article_soup = bs(article_content, "lxml")
@@ -139,6 +127,7 @@ class Puppy:
         all_anchors = current_article_soup.find_all("a")
         target_found = self.process_anchors(all_anchors)
         if target_found:
+            self.next_article = None
             return self.end_run(target_found)
         best_paragraph, best_sentences = self.get_best_paragraph(current_article_soup)
         if best_sentences:
@@ -148,29 +137,34 @@ class Puppy:
             best_link = best_anchor.get("href")
             if self.history.count(best_link) > 3:
                 self.skip.append(best_link)  # if stuck in a loop silently try another link on the current page
-                return self.current_url
+                self.next_article = self.current_url
+                return self
             best_paragraph = remove_all_tags(best_paragraph, True, action="unwrap", save=best_anchor, save_action=prepare_target_anchor)
-            self.make_update(best_paragraph, similarity)
+            self.update_data = self.make_update(best_paragraph, similarity)
             self.history.append(self.current_url)
-            return best_link
+            self.next_article = best_link
+            return self
         # if the current article cannot be used for lack of viable anchor tags silently go back to the last page
         # visited and try another link
         self.skip.append(self.current_url)
-        return self.history.pop()
+        self.next_article = self.history.pop()
+        return self
 
-    def go(self, article_url, manager_queue):
-        self.current_url = article_url
-        article_content = requests.get(article_url).text
-        next_article = self.process_article(article_content)
-        if not next_article:
-            return 1337
-        manager_queue.insert(0, (self, "go", (next_article, manager_queue)))
-
-    def init_run(self, start, target, manager_queue):
+    def init_run_parameters(self, start, target, socket_id):
         self.start = start
         self.target = target
-        target_content = requests.get(target).text
+        self.next_article = None
+        self.socket_id = socket_id
+
+    def go(self):
+        self.current_url = self.next_article
+        article_content = requests.get(self.current_url).text
+        return self.process_article(article_content)
+
+    def tokenize_target(self):
+        target_content = requests.get(self.target).text
         target_content_soup = bs(target_content, "lxml")
         self.tokenized_target = tokenize_article(target_content_soup)
-        manager_queue.insert(0, (self, "go", (self.start, manager_queue)))
+        self.next_article = self.start
+        return self
 
