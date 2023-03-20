@@ -12,6 +12,6 @@ This good boy can find a chain of articles connecting any two pages across the e
 
 In order to get the project set up and ready `cd` into the webapp folder and run `npm i` followed by `npm run build`, this will ensure that the front end of the app will be bundled and ready to be served by the flask server. Now `cd` back to the root of the project and run `python -m venv puppy_env` to keep things tidy and then run `pip install -r requirements.txt`. At this point puppy is ready to go, simply run `python server.py` and visit the web address logged by flask in the console, enjoy!
 
-<p align="center"><img src="./preview/puppy_start.png" width="50%"/></p>
+<p align="center"><img src="./preview/puppy_start.png" width="90%"/></p>
 
-<p align="center"><img src="./preview/puppy_result.png" width="50%"/></p>
+<p align="center"><img src="./preview/puppy_result.png" width="90%"/></p>
