@@ -51,14 +51,19 @@ const displayAlert = (message) => {
 }
 
 
-const startNewRun = (start, target) => {
+const emitRunStart = (start, target) => {
 
 	clearAllUpdates()
 
-	const formData = { "start": start, "target": target }
 	socket.emit("fetch", { start, target })
 	currentStart = start
 	currentTarget = target
+
+}
+
+
+const StartRun = () => {
+
 	running = true
 	startButton.classList.add("running")
 	startButton.value = "Running!"
@@ -68,11 +73,9 @@ const startNewRun = (start, target) => {
 }
 
 
-const stopRun = () => {
-	
+const stopPupper = () => {
+
 	clearAllUpdates()
-	
-	socket.emit("stop")
 
 	running = false
 	startButton.classList.remove("running")
@@ -143,7 +146,7 @@ const showUpdate = (update) => {
 	if (updateObject["type"] == "SUCCESS") {
 
 		resultFound = true
-	
+
 		updateItem.classList.add("success")
 
 		resultFlag.onclick = () => updateItem.scrollIntoView({ behavior: "smooth" })
@@ -152,10 +155,7 @@ const showUpdate = (update) => {
 			if (!resultFlag.classList.contains("enabled")) resultFlag.classList.add("enabled")
 		}
 
-		running = false
-		startButton.classList.remove("running")
-		startButton.value = "Let's go!"
-		abort.classList.remove("enabled")
+		stopPupper()
 
 	}
 
@@ -171,7 +171,7 @@ const submitForm = () => {
 	const start = document.getElementById("start").value
 	const target = document.getElementById("target").value
 
-	if(!start || !target){
+	if (!start || !target) {
 		displayAlert("We are missing either one of the two inputs")
 		return
 	}
@@ -181,7 +181,7 @@ const submitForm = () => {
 		return
 	}
 
-	startNewRun(start, target)
+	emitRunStart(start, target)
 
 }
 
@@ -189,11 +189,11 @@ const submitForm = () => {
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
 
-restart.addEventListener("click", () => startNewRun(currentStart, currentTarget))
+restart.addEventListener("click", () => emitRunStart(currentStart, currentTarget))
 backTop.addEventListener("click", scrollToTop)
 clearAll.addEventListener("click", clearAllUpdates)
 scrollLock.addEventListener("click", toggleLockScroll)
-abort.addEventListener("click", stopRun)
+abort.addEventListener("click", () => socket.emit("stop"))
 
 
 /////////////////////
@@ -207,6 +207,12 @@ socket.on('connected', (message) => console.log('socketIO connected', message))
 socket.on('puppy live update', showUpdate)
 
 socket.on('all puppers busy', displayAlert)
+
+socket.on('running', StartRun)
+
+socket.on('stopped', stopPupper)
+
+socket.on('disconnect', stopPupper)
 
 
 ////////////////////

@@ -24,11 +24,13 @@ def fetch_target(data):
     start = data["start"]
     target = data["target"]
     puppy_manager.let_dog_out(start, target, request.sid)
+    socketio.emit('running', '🚀', to=request.sid)
 
 
 @socketio.on('stop')
 def stop_puppy():
     puppy_manager.stop_puppy(request.sid)
+    socketio.emit('stopped', "💔", to=request.sid)
 
 
 @socketio.on('disconnect')
