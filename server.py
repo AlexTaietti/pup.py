@@ -2,6 +2,7 @@ from flask import Flask, request, send_from_directory
 from flask_socketio import SocketIO
 from puppy.puppy_manager import PuppyManager
 from threading import Thread
+import signal
 
 app = Flask(__name__, static_url_path='', static_folder="webapp/dist")
 socketio = SocketIO(app, cors_allowed_origins='*')
@@ -41,13 +42,23 @@ def disconnect_client():
         puppy_manager.stop_puppy(request.sid)
 
 
-def start_server():
-    socketio.run(app, host='0.0.0.0', allow_unsafe_werkzeug=True)
+def stop_server(*args):
+    puppy_manager.stop()
+    print("[*] shutting down")
+    exit()
 
 
 if __name__ == "__main__":
-    puppy_queue_processing_thread = Thread(name="puppy_queue", target=puppy_manager.process_tasks)
-    socket_server_thread = Thread(name="socket_server", target=start_server)
+
+    # handle signals
+    signal.signal(signal.SIGINT, stop_server)
+    signal.signal(signal.SIGTERM, stop_server)
+
+    # let's go!
     print("[*] let the dogs out!")
-    puppy_queue_processing_thread.start()
-    socket_server_thread.start()
+
+    # start processing puppy actions in a new thread
+    Thread(name="puppy_queue", target=puppy_manager.process_tasks).start()
+
+    # start socket server
+    socketio.run(app, host='0.0.0.0', allow_unsafe_werkzeug=True)

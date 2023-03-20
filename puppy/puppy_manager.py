@@ -7,13 +7,21 @@ from multiprocessing.pool import ThreadPool
 class PuppyManager:
 
     max_puppies = 5
-    polite_delay = 0.1  # in seconds
+    polite_delay = 0.15  # in seconds
 
     def __init__(self, websockets_emitter):
         self.puppy_queue = list()
         self.puppy_roster = dict()
         self.available_puppies = list()
         self.websocket_events_emitter = websockets_emitter
+        self.pool_of_threads = ThreadPool(self.max_puppies)
+        self.running = False
+
+    def stop(self):
+        self.running = False
+        self.pool_of_threads.close()
+        self.pool_of_threads.join()
+        print("[*] all puppy threads closed")
 
     def get_available_puppy(self, socket_id):
         if self.puppy_roster:
@@ -62,12 +70,12 @@ class PuppyManager:
         self.stop_puppy(threaded_puppy.socket_id)
 
     def process_tasks(self):
-        with ThreadPool(self.max_puppies) as pool_of_threads:
-            while True:
-                time.sleep(self.polite_delay)
-                if self.puppy_queue:
-                    pupper = self.puppy_queue.pop()
-                    if not pupper.next_article:
-                        pool_of_threads.apply_async(pupper.tokenize_target, callback=self.handle_threaded_puppy)
-                    pool_of_threads.apply_async(pupper.go, callback=self.handle_threaded_puppy)
+        self.running = True
+        while self.running:
+            time.sleep(self.polite_delay)
+            if self.puppy_queue:
+                pupper = self.puppy_queue.pop()
+                if not pupper.next_article:
+                    self.pool_of_threads.apply_async(pupper.tokenize_target, callback=self.handle_threaded_puppy)
+                self.pool_of_threads.apply_async(pupper.go, callback=self.handle_threaded_puppy)
 
