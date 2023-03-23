@@ -208,6 +208,8 @@ socket.on('puppy live update', showUpdate)
 
 socket.on('all puppers busy', displayAlert)
 
+socket.on('invalid input', displayAlert)
+
 socket.on('running', StartRun)
 
 socket.on('stopped', stopPupper)

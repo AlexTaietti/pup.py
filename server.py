@@ -1,8 +1,10 @@
+import signal
+
+from urllib.parse import urlparse
 from flask import Flask, request, send_from_directory
 from flask_socketio import SocketIO
 from puppy.puppy_manager import PuppyManager
 from threading import Thread
-import signal
 
 app = Flask(__name__, static_url_path='', static_folder="webapp/dist")
 socketio = SocketIO(app, cors_allowed_origins='*')
@@ -24,6 +26,11 @@ def test_connect():
 def fetch_target(data):
     start = data["start"]
     target = data["target"]
+    parsed_start = urlparse(start)
+    parsed_target = urlparse(target)
+    if parsed_start.hostname != "en.wikipedia.org" or parsed_target.hostname != "en.wikipedia.org":
+        socketio.emit('invalid input', 'the articles supplied must come from the english section of wikipedia', to=request.sid)
+        return
     puppy_manager.let_dog_out(start, target, request.sid)
     socketio.emit('running', '🚀', to=request.sid)
 
