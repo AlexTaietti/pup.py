@@ -75,8 +75,6 @@ const StartRun = () => {
 
 const stopPupper = () => {
 
-	clearAllUpdates()
-
 	running = false
 	startButton.classList.remove("running")
 	startButton.value = "Let's go!"
